@@ -162,6 +162,8 @@ h1,h2,h3,h4,h5 { font-family: 'Outfit', sans-serif; font-weight: 700; }
   top: 0;
   z-index: 100;
   backdrop-filter: blur(12px);
+  isolation: isolate;
+  will-change: transform;
 }
 .header-brand {
   display: flex;
@@ -222,6 +224,8 @@ h1,h2,h3,h4,h5 { font-family: 'Outfit', sans-serif; font-weight: 700; }
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
   scrollbar-width: none;
+  isolation: isolate;
+  will-change: transform;
 }
 .tab-nav::-webkit-scrollbar { display: none; }
 .tab-btn {
@@ -541,13 +545,25 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0,0,0,0.75);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 200;
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   animation: fadeIn 0.2s;
+  isolation: isolate;
+  will-change: opacity;
+}
+/* เมื่อ modal เปิดอยู่ ป้องกัน hover effects ด้านหลังที่ทำให้กระพริบ */
+body:has(.modal-overlay) .app-header,
+body:has(.modal-overlay) .tab-nav,
+body:has(.modal-overlay) .page-content,
+body.modal-open .app-header,
+body.modal-open .tab-nav,
+body.modal-open .page-content {
+  pointer-events: none !important;
 }
 .modal {
   background: var(--bg-card);

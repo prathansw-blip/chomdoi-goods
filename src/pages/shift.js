@@ -32,7 +32,7 @@ export function renderShift(container) {
   viewMode = 'current';
   selectedDate = null;
   draw(container);
-  unsub = subscribe(() => draw(container));
+  unsub = subscribe(() => { if (!document.querySelector('.modal-overlay')) draw(container); });
 }
 
 function draw(container) {

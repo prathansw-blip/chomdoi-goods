@@ -50,6 +50,10 @@ export function getUsers() { return state?.users || []; }
 export function getActiveShift() {
   return (state?.shifts || []).find(s => s.status === 'active') || null;
 }
+// Hotel Supplies
+export function getHotelSupplies() { return state?.hotelSupplies || []; }
+export function getSupplyChecks() { return state?.supplyChecks || []; }
+export function getSupplyRestocks() { return state?.supplyRestocks || []; }
 
 // ─── Mutations (auto-save) ───
 function commit() {
@@ -142,6 +146,37 @@ export function deleteShift(shiftId) {
 // Settings
 export function updateSettings(updates) {
   Object.assign(state.settings, updates);
+  commit();
+}
+
+// ─── Hotel Supplies ───
+export function addHotelSupply(supply) {
+  if (!state.hotelSupplies) state.hotelSupplies = [];
+  state.hotelSupplies.push(supply);
+  commit();
+}
+
+export function updateHotelSupply(supplyId, updates) {
+  if (!state.hotelSupplies) return;
+  const idx = state.hotelSupplies.findIndex(x => x.id === supplyId);
+  if (idx !== -1) { Object.assign(state.hotelSupplies[idx], updates); commit(); }
+}
+
+export function deleteHotelSupply(supplyId) {
+  if (!state.hotelSupplies) return;
+  state.hotelSupplies = state.hotelSupplies.filter(x => x.id !== supplyId);
+  commit();
+}
+
+export function addSupplyCheck(check) {
+  if (!state.supplyChecks) state.supplyChecks = [];
+  state.supplyChecks.push(check);
+  commit();
+}
+
+export function addSupplyRestock(log) {
+  if (!state.supplyRestocks) state.supplyRestocks = [];
+  state.supplyRestocks.push(log);
   commit();
 }
 

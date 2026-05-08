@@ -29,10 +29,13 @@ export function renderStock(container) {
   if (unsub) unsub();
   searchTerm = '';
   draw(container);
-  unsub = subscribe(() => draw(container));
+  unsub = subscribe(() => { if (!document.querySelector('.modal-overlay')) draw(container); });
 }
 
 function draw(container) {
+  // ถ้ามี modal เปิดอยู่ ไม่ต้อง re-render เพราะจะทำให้หน้ากระพริบ
+  if (document.querySelector('.modal-overlay')) return;
+
   const products = getProducts();
   const settings = getSettings();
   const currency = settings.currency || '฿';

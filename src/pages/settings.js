@@ -66,7 +66,7 @@ function showIconPicker(currentIcon, onSelect) {
 export function renderSettings(container) {
   if (unsub) unsub();
   draw(container);
-  unsub = subscribe(() => draw(container));
+  unsub = subscribe(() => { if (!document.querySelector('.modal-overlay')) draw(container); });
 }
 
 function draw(container) {
@@ -215,6 +215,25 @@ function draw(container) {
         </table>
       </div>
       <button class="btn btn-outline" id="btn-add-user" style="margin-top:0.75rem">➕ เพิ่มผู้ใช้</button>
+    </div>
+
+    <!-- Tab Labels -->
+    <div class="settings-section">
+      <div class="settings-section-title">🏷️ ชื่อเมนู</div>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">แก้ไขชื่อเมนูที่แสดงในแถบนำทาง</p>
+      <div style="display:grid;grid-template-columns:60px 1fr;gap:0.5rem 0.75rem;align-items:center">
+        ${[
+          { id: 'pos', icon: '🛒', def: 'ขาย' },
+          { id: 'stock', icon: '📦', def: 'Stock' },
+          { id: 'restock', icon: '➕', def: 'เติมของ' },
+          { id: 'shift', icon: '📊', def: 'สรุปกะ' },
+          { id: 'hotel', icon: '🏨', def: 'ของใช้' },
+          { id: 'settings', icon: '⚙️', def: 'ตั้งค่า' },
+        ].map(t => `
+          <div style="text-align:center;font-size:1.2rem">${t.icon}</div>
+          <input class="form-input s-tab-label" data-tab-id="${t.id}" value="${(s.tabLabels || {})[t.id] || t.def}" placeholder="${t.def}" style="padding:0.4rem 0.6rem">
+        `).join('')}
+      </div>
     </div>
 
     <!-- General -->
@@ -445,6 +464,16 @@ function saveCurrentSettings(currentSettings) {
     currency: document.getElementById('s-currency').value,
     lowStockThreshold: +document.getElementById('s-threshold').value || 5,
     shiftDefinitions: shiftDefs,
+    // Collect tab labels
+    tabLabels: (() => {
+      const labels = {};
+      document.querySelectorAll('.s-tab-label').forEach(input => {
+        const id = input.dataset.tabId;
+        const val = input.value.trim();
+        if (val) labels[id] = val;
+      });
+      return labels;
+    })(),
     // Collect categories from inputs
     categories: Array.from(document.querySelectorAll('.s-cat-name')).map((input, i) => {
       const existingCat = (currentSettings.categories || [])[i];
@@ -548,16 +577,14 @@ function showUserModal(container, editId = null) {
 
     try {
       // Check username duplicate
-      if (username && !existing) {
-        const dup = users.find(u => u.username.toLowerCase() === username);
+      if (username) {
+        const dup = users.find(u => u.username.toLowerCase() === username && u.id !== (existing?.id || ''));
         if (dup) throw new Error(`Username "${username}" มีอยู่แล้ว`);
       }
 
       if (existing) {
         const updates = { displayName, role, active: activeVal !== 'false' };
-        // We only update hash locally. Firebase Auth password cannot be changed easily without Admin SDK.
-        // The user must still use their old password to login to Firebase if they don't change it there.
-        // We will just update our local hash.
+        if (username && username !== existing.username.toLowerCase()) updates.username = username;
         if (password) updates.passwordHash = hashPassword(password);
         updateUser(existing.id, updates);
         showToast(`อัปเดต ${displayName} สำเร็จ`, 'success');
@@ -568,8 +595,15 @@ function showUserModal(container, editId = null) {
         const tempAuth = getAuth(tempApp);
         
         const email = username + '@chomdoi.local';
-        await createUserWithEmailAndPassword(tempAuth, email, password);
-        await signOut(tempAuth); // Sign out of the temp app
+        try {
+          await createUserWithEmailAndPassword(tempAuth, email, password);
+          await signOut(tempAuth);
+        } catch (authErr) {
+          // If email already exists in Firebase Auth (e.g. user was deleted and re-created), just skip
+          if (authErr.code !== 'auth/email-already-in-use') {
+            throw authErr;
+          }
+        }
 
         addUser({
           id: 'user_' + Date.now(),

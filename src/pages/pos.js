@@ -14,7 +14,7 @@ export function renderPOS(container) {
   cart = [];
   activeFilter = 'all';
   draw(container);
-  unsub = subscribe(() => draw(container));
+  unsub = subscribe(() => { if (!document.querySelector('.modal-overlay')) draw(container); });
 
   // เช็ค stock ต่ำทีแรกเดียว (session)
   if (!_initialAlertDone) {

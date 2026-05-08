@@ -9,6 +9,7 @@ import { renderPOS, destroyPOS } from './pages/pos.js';
 import { renderStock, destroyStock } from './pages/stock.js';
 import { renderRestock, destroyRestock } from './pages/restock.js';
 import { renderShift, destroyShift } from './pages/shift.js';
+import { renderHotelSupply, destroyHotelSupply } from './pages/hotelSupply.js';
 import { renderSettings, destroySettings } from './pages/settings.js';
 
 const allTabs = [
@@ -16,6 +17,7 @@ const allTabs = [
   { id: 'stock', icon: '📦', label: 'Stock', render: renderStock, destroy: destroyStock, adminOnly: true },
   { id: 'restock', icon: '➕', label: 'เติมของ', render: renderRestock, destroy: destroyRestock, adminOnly: false },
   { id: 'shift', icon: '📊', label: 'สรุปกะ', render: renderShift, destroy: destroyShift, adminOnly: false },
+  { id: 'hotel', icon: '🏨', label: 'ของใช้', render: renderHotelSupply, destroy: destroyHotelSupply, adminOnly: false },
   { id: 'settings', icon: '⚙️', label: 'ตั้งค่า', render: renderSettings, destroy: destroySettings, adminOnly: true },
 ];
 
@@ -25,6 +27,13 @@ let activeTab = 'pos';
 export function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme || 'dark-gold');
 }
+
+// ─── Modal observer: toggle body class to prevent flicker ───
+const modalObserver = new MutationObserver(() => {
+  const hasModal = document.querySelector('.modal-overlay');
+  document.body.classList.toggle('modal-open', !!hasModal);
+});
+modalObserver.observe(document.body, { childList: true, subtree: true });
 
 async function boot() {
   await initStore();
@@ -40,7 +49,10 @@ async function boot() {
     renderApp();
   }
   subscribe(() => {
-    updateHeader();
+    // ถ้ามี modal เปิดอยู่ ไม่ต้อง re-render header เพราะจะทำให้หน้ากระพริบ
+    if (!document.querySelector('.modal-overlay')) {
+      updateHeader();
+    }
     // Re-apply theme when settings change
     applyTheme(getSettings().theme || 'dark-gold');
   });
@@ -81,7 +93,7 @@ function updateHeader() {
   const user = getCurrentUser();
   const initials = user ? user.displayName.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() : '?';
 
-  header.innerHTML = `
+  const newHTML = `
     <div class="header-brand">
       ${s.companyLogo
         ? `<img class="header-logo" src="${s.companyLogo}" alt="logo">`
@@ -105,7 +117,11 @@ function updateHeader() {
     </div>
   `;
 
-  document.getElementById('btn-logout')?.addEventListener('click', doLogout);
+  // Only replace DOM if content actually changed — prevents hover/transition flicker
+  if (header.innerHTML.replace(/\s+/g, ' ').trim() !== newHTML.replace(/\s+/g, ' ').trim()) {
+    header.innerHTML = newHTML;
+    document.getElementById('btn-logout')?.addEventListener('click', doLogout);
+  }
 }
 
 function doLogout() {
@@ -135,16 +151,24 @@ function doLogout() {
 
 function renderNav() {
   const tabs = getTabs();
+  const s = getSettings();
+  const customLabels = s.tabLabels || {};
   const nav = document.getElementById('tab-nav');
-  nav.innerHTML = tabs.map(t =>
+  if (!nav) return;
+  const newHTML = tabs.map(t =>
     `<button class="tab-btn ${t.id === activeTab ? 'active' : ''}" data-tab="${t.id}">
       <span class="tab-icon">${t.icon}</span>
-      <span>${t.label}</span>
+      <span>${customLabels[t.id] || t.label}</span>
     </button>`
   ).join('');
-  nav.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.onclick = () => navigateTo(btn.dataset.tab);
-  });
+
+  // Only replace DOM if content actually changed — prevents hover flicker
+  if (nav.innerHTML.replace(/\s+/g, ' ').trim() !== newHTML.replace(/\s+/g, ' ').trim()) {
+    nav.innerHTML = newHTML;
+    nav.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => navigateTo(btn.dataset.tab);
+    });
+  }
 }
 
 function navigateTo(tabId) {

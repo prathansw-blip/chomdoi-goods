@@ -109,3 +109,35 @@ export async function sendSaleNotification(txn) {
   if (txn.freeReason) lines.push(`💬 เหตุผล: ${txn.freeReason}`);
   return pushMessage([{ type: 'text', text: lines.join('\n') }]);
 }
+
+export async function sendSupplyCheckNotification(data) {
+  const settings = getSettings();
+  if (!settings.line?.enabled) return;
+  const lines = [
+    `🏨 เช็คของใช้ประจำวัน`,
+    `📅 ${data.date}`,
+    `👤 ผู้เช็ค: ${data.checkedBy}`,
+    `━━━━━━━━━━━━━━━━━━━`,
+  ];
+  const lowStockItems = [];
+  data.items.forEach(item => {
+    let usageText = '';
+    if (item.usage !== null && item.usage !== undefined) {
+      usageText = item.usage > 0 ? ` (ใช้ไป ${item.usage})` : ' (ไม่มีใช้)';
+    }
+    const isLow = item.threshold !== undefined && item.count <= item.threshold;
+    const prefix = isLow ? '⚠️' : item.icon;
+    lines.push(`${prefix} ${item.name}: ${item.count} ${item.unit}${usageText}`);
+    if (isLow) lowStockItems.push(item);
+  });
+  lines.push(`━━━━━━━━━━━━━━━━━━━`);
+  lines.push(`📦 รายการทั้งหมด: ${data.items.length} รายการ`);
+  if (lowStockItems.length > 0) {
+    lines.push('');
+    lines.push(`🚨 ของใช้ใกล้หมด ${lowStockItems.length} รายการ:`);
+    lowStockItems.forEach(item => {
+      lines.push(`  ⚠️ ${item.name}: เหลือ ${item.count} ${item.unit} (เตือน≤${item.threshold})`);
+    });
+  }
+  return pushMessage([{ type: 'text', text: lines.join('\n') }]);
+}

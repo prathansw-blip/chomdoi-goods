@@ -8,7 +8,7 @@ let unsub = null;
 export function renderRestock(container) {
   if (unsub) unsub();
   draw(container);
-  unsub = subscribe(() => draw(container));
+  unsub = subscribe(() => { if (!document.querySelector('.modal-overlay')) draw(container); });
 }
 
 function draw(container) {
