@@ -44,7 +44,7 @@ export function renderLogin(onSuccess) {
           </button>
         </div>
 
-        <div class="login-footer">Chomdoi Goods POS v2.0</div>
+        <div class="login-footer">Chomdoi Goods POS v2.1</div>
       </div>
     </div>
   `;
