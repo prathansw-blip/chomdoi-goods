@@ -55,6 +55,23 @@ async function boot() {
     }
     // Re-apply theme when settings change
     applyTheme(getSettings().theme || 'dark-gold');
+
+    // ถ้าอยู่หน้า login → re-render เพื่อให้ logo/ชื่อ update ตาม Firestore
+    const loginPage = document.querySelector('.login-page');
+    if (loginPage) {
+      const newSettings = getSettings();
+      const titleEl = loginPage.querySelector('.login-title');
+      const logoContainer = loginPage.querySelector('.login-logo');
+      if (titleEl && titleEl.textContent !== (newSettings.companyName || 'Chomdoi Goods')) {
+        titleEl.textContent = newSettings.companyName || 'Chomdoi Goods';
+      }
+      if (logoContainer && newSettings.companyLogo) {
+        const currentImg = logoContainer.querySelector('img');
+        if (!currentImg || currentImg.src !== newSettings.companyLogo) {
+          logoContainer.innerHTML = `<img src="${newSettings.companyLogo}" alt="logo" class="login-logo-img">`;
+        }
+      }
+    }
   });
 }
 
