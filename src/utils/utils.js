@@ -79,9 +79,11 @@ export function getStockStatus(product) {
 // ─── Business Day Helpers ───
 // "วันทำงาน" จบที่ businessDayStartHour (default 08:00)
 // เช่น เวลา 02:00 ของวันที่ 27 → ถือเป็นวันทำงานของวันที่ 26
+// tolerance: ถ้าเปิดกะก่อน startHour ไม่เกิน 1 ชม. (เช่น 07:xx) ยังนับเป็นวันนี้
 export function getBusinessDate(date, startHour = 8) {
   const d = new Date(date);
-  if (d.getHours() < startHour) {
+  const tolerance = 1; // ชั่วโมง
+  if (d.getHours() < (startHour - tolerance)) {
     d.setDate(d.getDate() - 1);
   }
   // ใช้ local date แทน toISOString() (UTC) เพื่อให้ตรงกับ timezone ไทย
