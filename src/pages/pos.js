@@ -1,6 +1,6 @@
 // pos.js — หน้าขายสินค้า (POS)
-import { getProducts, addTransaction, getActiveShift, subscribe, getSettings } from '../data/store.js';
-import { generateId, formatCurrency, showToast, getCategoryLabels, getStockStatus, getProductIcon, getBusinessDate } from '../utils/utils.js';
+import { getProducts, getTransactions, addTransaction, getActiveShift, subscribe, getSettings } from '../data/store.js';
+import { generateId, formatCurrency, formatTime, formatBusinessDate, showToast, getCategoryLabels, getStockStatus, getProductIcon, getBusinessDate } from '../utils/utils.js';
 import { sendLowStockAlert, sendSaleNotification } from '../utils/lineNotify.js';
 
 let cart = [];
@@ -73,32 +73,35 @@ function draw(container) {
           ${filtered.length === 0 ? '<div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-text">ไม่มีสินค้าในหมวดนี้</div></div>' : ''}
         </div>
       </div>
-      <div class="cart card">
-        <div class="card-header">🧾 ตะกร้า</div>
-        ${cart.length === 0 ? '<div class="cart-empty">ยังไม่มีสินค้าในตะกร้า<br>กดที่สินค้าเพื่อเพิ่ม</div>' : `
-          <div class="cart-items">
-            ${cart.map((c, i) => `
-              <div class="cart-item">
-                <div class="cart-item-info">
-                  <span>${c.image}</span>
-                  <span class="cart-item-name">${c.name}</span>
+      <div class="cart-sidebar">
+        <div class="cart card">
+          <div class="card-header">🧾 ตะกร้า</div>
+          ${cart.length === 0 ? '<div class="cart-empty">ยังไม่มีสินค้าในตะกร้า<br>กดที่สินค้าเพื่อเพิ่ม</div>' : `
+            <div class="cart-items">
+              ${cart.map((c, i) => `
+                <div class="cart-item">
+                  <div class="cart-item-info">
+                    <span>${c.image}</span>
+                    <span class="cart-item-name">${c.name}</span>
+                  </div>
+                  <div class="cart-qty-controls">
+                    <button class="cart-qty-btn" data-action="dec" data-idx="${i}">−</button>
+                    <span class="cart-qty">${c.qty}</span>
+                    <button class="cart-qty-btn" data-action="inc" data-idx="${i}">+</button>
+                  </div>
+                  <span class="cart-item-subtotal">${formatCurrency(c.subtotal, currency)}</span>
+                  <button class="cart-qty-btn" data-action="remove" data-idx="${i}" style="color:var(--red);border-color:var(--red);margin-left:0.3rem;">✕</button>
                 </div>
-                <div class="cart-qty-controls">
-                  <button class="cart-qty-btn" data-action="dec" data-idx="${i}">−</button>
-                  <span class="cart-qty">${c.qty}</span>
-                  <button class="cart-qty-btn" data-action="inc" data-idx="${i}">+</button>
-                </div>
-                <span class="cart-item-subtotal">${formatCurrency(c.subtotal, currency)}</span>
-                <button class="cart-qty-btn" data-action="remove" data-idx="${i}" style="color:var(--red);border-color:var(--red);margin-left:0.3rem;">✕</button>
-              </div>
-            `).join('')}
-          </div>
-          <div class="cart-total">
-            <span>รวมทั้งหมด</span>
-            <span class="cart-total-amount">${formatCurrency(cartTotal, currency)}</span>
-          </div>
-          <button class="btn btn-primary btn-lg btn-block" id="btn-confirm-sale" style="margin-top:1rem;">✅ ยืนยันการขาย</button>
-        `}
+              `).join('')}
+            </div>
+            <div class="cart-total">
+              <span>รวมทั้งหมด</span>
+              <span class="cart-total-amount">${formatCurrency(cartTotal, currency)}</span>
+            </div>
+            <button class="btn btn-primary btn-lg btn-block" id="btn-confirm-sale" style="margin-top:1rem;">✅ ยืนยันการขาย</button>
+          `}
+        </div>
+        ${buildShiftSummary(settings, currency)}
       </div>
     </div>
   `;
@@ -106,7 +109,7 @@ function draw(container) {
   if (!document.getElementById('pos-style')) {
     const s = document.createElement('style');
     s.id = 'pos-style';
-    s.textContent = `.pos-layout{display:grid;grid-template-columns:1fr 380px;gap:1.25rem;align-items:start}@media(max-width:900px){.pos-layout{grid-template-columns:1fr}.cart{position:sticky;bottom:0}}.pay-option{display:flex;gap:0.75rem;margin-bottom:1rem}.pay-btn{flex:1;padding:1rem;border-radius:var(--radius);border:2px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:1rem;cursor:pointer;text-align:center;transition:var(--transition);font-family:'Inter',sans-serif}.pay-btn:hover{border-color:var(--gold)}.pay-btn.selected{border-color:var(--gold);background:rgba(245,158,11,0.15)}.pay-btn .pay-icon{font-size:1.5rem;display:block;margin-bottom:0.3rem}`;
+    s.textContent = `.pos-layout{display:grid;grid-template-columns:1fr 380px;gap:1.25rem;align-items:start}@media(max-width:900px){.pos-layout{grid-template-columns:1fr}.cart-sidebar{position:sticky;bottom:0}}.cart-sidebar{display:flex;flex-direction:column;gap:1rem}.pay-option{display:flex;gap:0.75rem;margin-bottom:1rem}.pay-btn{flex:1;padding:1rem;border-radius:var(--radius);border:2px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:1rem;cursor:pointer;text-align:center;transition:var(--transition);font-family:'Inter',sans-serif}.pay-btn:hover{border-color:var(--gold)}.pay-btn.selected{border-color:var(--gold);background:rgba(245,158,11,0.15)}.pay-btn .pay-icon{font-size:1.5rem;display:block;margin-bottom:0.3rem}.shift-summary-item{display:flex;justify-content:space-between;align-items:center;padding:0.35rem 0;font-size:0.85rem;border-bottom:1px solid rgba(148,163,184,0.1)}.shift-summary-item:last-child{border-bottom:none}`;
     document.head.appendChild(s);
   }
 
@@ -266,6 +269,80 @@ function confirmSale(container, paymentMethod = 'cash', freeReason = null) {
   showToast(`ขายสำเร็จ — ${formatCurrency(txn.total, getSettings().currency || '฿')} (${labels[paymentMethod]})`, 'success');
   cart = [];
   draw(container);
+}
+
+// ═══ Shift Summary Panel ═══
+function buildShiftSummary(settings, currency) {
+  const active = getActiveShift();
+  if (!active) {
+    return `
+      <div class="card" style="opacity:0.6">
+        <div class="card-header">📊 สรุปกะ</div>
+        <div style="text-align:center;padding:1.5rem 0;color:var(--text-muted);font-size:0.9rem">
+          ⚪ ยังไม่เปิดกะ
+        </div>
+      </div>`;
+  }
+
+  const transactions = getTransactions();
+  const shiftTxns = transactions.filter(t => t.shiftId === active.id);
+  const startHour = settings.businessDayStartHour || 8;
+
+  // Payment breakdown
+  const cash = shiftTxns.filter(t => (t.paymentMethod || 'cash') === 'cash').reduce((s, t) => s + t.total, 0);
+  const transfer = shiftTxns.filter(t => t.paymentMethod === 'transfer').reduce((s, t) => s + t.total, 0);
+  const free = shiftTxns.filter(t => t.paymentMethod === 'free').reduce((s, t) => s + t.total, 0);
+  const total = cash + transfer;
+
+  // Items sold aggregate
+  const itemMap = {};
+  shiftTxns.forEach(t => t.items.forEach(item => {
+    if (!itemMap[item.name]) itemMap[item.name] = { qty: 0, total: 0 };
+    itemMap[item.name].qty += item.qty;
+    itemMap[item.name].total += item.subtotal;
+  }));
+  const sortedItems = Object.entries(itemMap).sort((a, b) => b[1].qty - a[1].qty);
+
+  return `
+    <div class="card">
+      <div class="card-header">📊 สรุปกะปัจจุบัน</div>
+      <div style="padding:0.5rem 0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+          <span style="font-size:0.8rem;color:var(--text-muted)">📅 ${formatBusinessDate(active.businessDate || getBusinessDate(active.startTime, startHour))}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+          <span style="font-weight:600;color:var(--text-primary)">${active.icon || '⏰'} ${active.name}</span>
+          <span style="font-size:0.85rem;color:var(--text-muted)">เริ่ม ${formatTime(active.startTime)}</span>
+        </div>
+
+        <div style="background:var(--bg-input);border-radius:var(--radius-sm);padding:0.75rem;margin-bottom:0.75rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem">
+            <span style="font-size:0.85rem;color:var(--text-muted)">ยอดขาย</span>
+            <span style="font-size:1.2rem;font-weight:700;color:var(--gold)">${formatCurrency(total, currency)}</span>
+          </div>
+          <div style="display:flex;gap:0.4rem;flex-wrap:wrap;font-size:0.78rem">
+            <span class="badge badge-success">💵 ${formatCurrency(cash, currency)}</span>
+            <span class="badge badge-info">📱 ${formatCurrency(transfer, currency)}</span>
+            ${free > 0 ? `<span class="badge badge-warning">🎁 ${formatCurrency(free, currency)}</span>` : ''}
+          </div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.4rem">${shiftTxns.length} bills</div>
+        </div>
+
+        ${sortedItems.length > 0 ? `
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.4rem;font-weight:600">🛒 รายการที่ขาย</div>
+          <div style="max-height:200px;overflow-y:auto">
+            ${sortedItems.map(([name, data]) => `
+              <div class="shift-summary-item">
+                <span style="color:var(--text-secondary)">${name} <span style="color:var(--text-muted)">×${data.qty}</span></span>
+                <span style="font-weight:600;color:var(--text-primary)">${formatCurrency(data.total, currency)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : `
+          <div style="text-align:center;padding:0.75rem 0;color:var(--text-muted);font-size:0.85rem">ยังไม่มียอดขาย</div>
+        `}
+      </div>
+    </div>`;
 }
 
 export function destroyPOS() { if (unsub) { unsub(); unsub = null; } }
