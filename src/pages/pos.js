@@ -170,7 +170,25 @@ function showPaymentModal(container) {
       <div id="free-reason-wrap" style="display:none">
         <div class="form-group">
           <label class="form-label">ระบุเหตุผล <span style="color:var(--red)">*</span></label>
-          <input class="form-input" id="free-reason" placeholder="เช่น ลูกค้า VIP, ของแถม">
+          <select class="form-select" id="free-reason-select">
+            <option value="">— เลือกเหตุผล —</option>
+            <option value="ให้ช่าง">ให้ช่าง</option>
+            <option value="ให้แขก">ให้แขก</option>
+            <option value="ให้พี่เก่ง">ให้พี่เก่ง</option>
+            <option value="อื่นๆ">อื่นๆ</option>
+          </select>
+        </div>
+        <div id="free-guest-detail" style="display:none">
+          <div class="form-group">
+            <label class="form-label">🚪 เบอร์ห้อง</label>
+            <input class="form-input" id="free-room" placeholder="เช่น 201, 305">
+          </div>
+        </div>
+        <div id="free-other-detail" style="display:none">
+          <div class="form-group">
+            <label class="form-label">📝 ระบุเหตุผล</label>
+            <input class="form-input" id="free-other-text" placeholder="พิมพ์เหตุผล...">
+          </div>
         </div>
       </div>
       <div class="modal-actions">
@@ -183,6 +201,10 @@ function showPaymentModal(container) {
 
   const payBtns = overlay.querySelectorAll('.pay-btn');
   const freeWrap = overlay.querySelector('#free-reason-wrap');
+  const freeSelect = overlay.querySelector('#free-reason-select');
+  const guestDetail = overlay.querySelector('#free-guest-detail');
+  const otherDetail = overlay.querySelector('#free-other-detail');
+
   payBtns.forEach(btn => {
     btn.onclick = () => {
       payBtns.forEach(b => b.classList.remove('selected'));
@@ -191,11 +213,32 @@ function showPaymentModal(container) {
       freeWrap.style.display = selectedMethod === 'free' ? 'block' : 'none';
     };
   });
+
+  // Show/hide conditional fields based on dropdown selection
+  freeSelect.onchange = () => {
+    const val = freeSelect.value;
+    guestDetail.style.display = val === 'ให้แขก' ? 'block' : 'none';
+    otherDetail.style.display = val === 'อื่นๆ' ? 'block' : 'none';
+  };
+
   overlay.querySelector('#pay-cancel').onclick = () => overlay.remove();
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   overlay.querySelector('#pay-confirm').onclick = () => {
-    const reason = selectedMethod === 'free' ? document.getElementById('free-reason').value.trim() : null;
-    if (selectedMethod === 'free' && !reason) { showToast('กรุณาระบุเหตุผล', 'warning'); return; }
+    let reason = null;
+    if (selectedMethod === 'free') {
+      const sel = freeSelect.value;
+      if (!sel) { showToast('กรุณาเลือกเหตุผล', 'warning'); return; }
+      if (sel === 'ให้แขก') {
+        const room = document.getElementById('free-room').value.trim();
+        reason = room ? `ให้แขก (ห้อง ${room})` : 'ให้แขก';
+      } else if (sel === 'อื่นๆ') {
+        const otherText = document.getElementById('free-other-text').value.trim();
+        if (!otherText) { showToast('กรุณาระบุเหตุผล', 'warning'); return; }
+        reason = otherText;
+      } else {
+        reason = sel;
+      }
+    }
     confirmSale(container, selectedMethod, reason);
     overlay.remove();
   };
