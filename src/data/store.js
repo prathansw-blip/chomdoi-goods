@@ -9,24 +9,21 @@ import {
 let state = null;
 let listeners = [];
 let saveTimer = null;
-let lastCommitTime = 0; // ป้องกัน Firestore revert ทับ local changes
+let dirty = false; // true = มี local changes ที่ยังไม่ได้ save สำเร็จ
 
 // ─── Init ───
 export async function initStore() {
   unsubscribeAll();
   state = await loadData();
-  lastCommitTime = 0;
+  dirty = false;
 
   // Migration: backfill businessDate on old transactions
   migrateTransactionBusinessDates();
 
   // Listen for Firebase real-time changes
   subscribeToChanges((newData) => {
-    // ถ้าเพิ่งทำ local change ไป (เช่น เปิดกะ, ขายสินค้า) ไม่ต้องให้ Firestore revert ทับ
-    const elapsed = Date.now() - lastCommitTime;
-    if (lastCommitTime > 0 && elapsed < 3000) {
-      return; // ข้าม snapshot ที่มาใน 3 วิหลัง commit
-    }
+    // ถ้ามี local changes ค้างอยู่ (ยังไม่ save สำเร็จ) ข้าม snapshot นี้
+    if (dirty) return;
     state = newData;
     notifyAll();
   });
@@ -89,10 +86,28 @@ export function getSupplyRestocks() {
 
 // ─── Mutations (auto-save) ───
 function commit() {
-  lastCommitTime = Date.now();
+  dirty = true;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => saveData(state), 300);
+  saveTimer = setTimeout(async () => {
+    try {
+      await saveData(state);
+    } finally {
+      dirty = false;
+    }
+  }, 300);
   notifyAll();
+}
+
+// Save ทันทีสำหรับ operations สำคัญ (เปิด/ปิดกะ)
+async function commitImmediate() {
+  dirty = true;
+  clearTimeout(saveTimer);
+  notifyAll();
+  try {
+    await saveData(state);
+  } finally {
+    dirty = false;
+  }
 }
 
 // Products
@@ -169,7 +184,7 @@ export function addRestockLog(log) {
 }
 
 // Shifts
-export function startShift(shift) {
+export async function startShift(shift) {
   // Close any active shift first
   state.shifts.forEach((s) => {
     if (s.status === "active") {
@@ -178,16 +193,16 @@ export function startShift(shift) {
     }
   });
   state.shifts.push(shift);
-  commit();
+  await commitImmediate();
 }
 
-export function closeShift(shiftId, closedBy = null) {
+export async function closeShift(shiftId, closedBy = null) {
   const s = state.shifts.find((x) => x.id === shiftId);
   if (s) {
     s.status = "closed";
     s.endTime = new Date().toISOString();
     if (closedBy) s.closedBy = closedBy;
-    commit();
+    await commitImmediate();
   }
   return s;
 }
