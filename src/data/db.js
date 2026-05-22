@@ -115,8 +115,10 @@ export function subscribeToChanges(callback) {
   const unsub = onSnapshot(doc(db, 'stores', STORE_ID), (snap) => {
     if (snap.exists()) {
       const data = snap.data();
+      // hasPendingWrites=true → ยังไม่ได้ confirm จาก server (อาจ revert ได้)
+      const fromServer = !snap.metadata.hasPendingWrites;
       saveLocal(data);
-      callback(data);
+      callback(data, fromServer);
     }
   });
   unsubscribers.push(unsub);
