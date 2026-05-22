@@ -337,10 +337,10 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
       overlay.onclick = (e) => {
         if (e.target === overlay) overlay.remove();
       };
-      overlay.querySelector("#open-confirm").onclick = async () => {
+      overlay.querySelector("#open-confirm").onclick = () => {
         const openerId = document.getElementById("opener-select").value;
         const opener = users.find((u) => u.id === openerId);
-        await startShift({
+        startShift({
           id: generateId("shift"),
           defId: def.id,
           name: def.name,
@@ -404,10 +404,10 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
       overlay.onclick = (e) => {
         if (e.target === overlay) overlay.remove();
       };
-      overlay.querySelector("#cs-confirm").onclick = async () => {
+      overlay.querySelector("#cs-confirm").onclick = () => {
         const closerId = document.getElementById("closer-select").value;
         const closer = users.find((u) => u.id === closerId);
-        await closeShift(
+        closeShift(
           active.id,
           closer ? { id: closer.id, displayName: closer.displayName } : null,
         );

@@ -159,7 +159,7 @@ export function unsubscribeAll() {
 }
 
 // ─── localStorage helpers ───
-function saveLocal(data) {
+export function saveLocal(data) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(data));
   } catch (e) {

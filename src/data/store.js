@@ -2,6 +2,7 @@
 import {
   loadData,
   saveData,
+  saveLocal,
   subscribeToChanges,
   unsubscribeAll,
 } from "./db.js";
@@ -87,27 +88,14 @@ export function getSupplyRestocks() {
 // ─── Mutations (auto-save) ───
 function commit() {
   dirty = true;
+  // บันทึก localStorage ทันที (ป้องกันข้อมูลหายถ้า refresh เร็ว)
+  saveLocal(state);
+  // Firestore sync แบบ debounce (fire-and-forget)
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
-    try {
-      await saveData(state);
-    } finally {
-      dirty = false;
-    }
+  saveTimer = setTimeout(() => {
+    saveData(state).finally(() => { dirty = false; });
   }, 300);
   notifyAll();
-}
-
-// Save ทันทีสำหรับ operations สำคัญ (เปิด/ปิดกะ)
-async function commitImmediate() {
-  dirty = true;
-  clearTimeout(saveTimer);
-  notifyAll();
-  try {
-    await saveData(state);
-  } finally {
-    dirty = false;
-  }
 }
 
 // Products
@@ -184,7 +172,7 @@ export function addRestockLog(log) {
 }
 
 // Shifts
-export async function startShift(shift) {
+export function startShift(shift) {
   // Close any active shift first
   state.shifts.forEach((s) => {
     if (s.status === "active") {
@@ -193,16 +181,16 @@ export async function startShift(shift) {
     }
   });
   state.shifts.push(shift);
-  await commitImmediate();
+  commit();
 }
 
-export async function closeShift(shiftId, closedBy = null) {
+export function closeShift(shiftId, closedBy = null) {
   const s = state.shifts.find((x) => x.id === shiftId);
   if (s) {
     s.status = "closed";
     s.endTime = new Date().toISOString();
     if (closedBy) s.closedBy = closedBy;
-    await commitImmediate();
+    commit();
   }
   return s;
 }
