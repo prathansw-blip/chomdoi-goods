@@ -4,23 +4,25 @@ import { loadData, saveData, subscribeToChanges, unsubscribeAll } from './db.js'
 let state = null;
 let listeners = [];
 let saveTimer = null;
-let localVersion = 0;  // Track local changes to prevent Firestore revert
+let lastCommitTime = 0;  // ป้องกัน Firestore revert ทับ local changes
 
 // ─── Init ───
 export async function initStore() {
   unsubscribeAll();
   state = await loadData();
-  localVersion = 0;
+  lastCommitTime = 0;
 
   // Migration: backfill businessDate on old transactions
   migrateTransactionBusinessDates();
 
   // Listen for Firebase real-time changes
-  subscribeToChanges((newData, fromServer) => {
-    // ถ้ามี local changes ที่ยังไม่ได้ sync ไป server ไม่ต้องให้ server revert ทับ
-    if (localVersion > 0 && !fromServer) return;
+  subscribeToChanges((newData) => {
+    // ถ้าเพิ่งทำ local change ไป (เช่น เปิดกะ, ขายสินค้า) ไม่ต้องให้ Firestore revert ทับ
+    const elapsed = Date.now() - lastCommitTime;
+    if (lastCommitTime > 0 && elapsed < 3000) {
+      return; // ข้าม snapshot ที่มาใน 3 วิหลัง commit
+    }
     state = newData;
-    localVersion = 0;  // Server confirmed — reset version
     notifyAll();
   });
   return state;
@@ -62,11 +64,9 @@ export function getSupplyRestocks() { return state?.supplyRestocks || []; }
 
 // ─── Mutations (auto-save) ───
 function commit() {
-  localVersion++;  // ทำเครื่องหมายว่ามี local change ค้างอยู่
+  lastCommitTime = Date.now();
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => saveData(state).then(() => {
-    localVersion = Math.max(0, localVersion - 1);  // save สำเร็จ
-  }).catch(() => {}), 300);
+  saveTimer = setTimeout(() => saveData(state), 300);
   notifyAll();
 }
 

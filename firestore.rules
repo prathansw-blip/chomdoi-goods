@@ -2,8 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /stores/{storeId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      // App ใช้ local hash auth ไม่ได้ใช้ Firebase Auth สำหรับ access control
+      // Firebase Auth ใช้เป็น best-effort สำหรับ Firestore access เท่านั้น
+      allow read, write: if true;
     }
   }
 }
