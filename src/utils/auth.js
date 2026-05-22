@@ -1,8 +1,13 @@
 // auth.js — Authentication & Session Management
-import { getFirebaseAuth } from '../data/db.js';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword, signOut as fbSignOut } from 'firebase/auth';
+import { getFirebaseAuth } from "../data/db.js";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updatePassword,
+  signOut as fbSignOut,
+} from "firebase/auth";
 
-const SESSION_KEY = 'chomdoi_session';
+const SESSION_KEY = "chomdoi_session";
 
 // ─── Simple Hash (not cryptographic, just obfuscation for internal tool) ───
 export function hashPassword(password) {
@@ -10,7 +15,7 @@ export function hashPassword(password) {
   const str = `chomdoi_salt_${password}_2024`;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // 32bit int
   }
   return hash.toString(36);
@@ -21,7 +26,9 @@ export function getCurrentUser() {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export function setCurrentUser(user) {
@@ -31,7 +38,11 @@ export function setCurrentUser(user) {
 export async function logout() {
   const auth = getFirebaseAuth();
   if (auth) {
-    try { await fbSignOut(auth); } catch (e) { console.warn(e); }
+    try {
+      await fbSignOut(auth);
+    } catch (e) {
+      console.warn(e);
+    }
   }
   sessionStorage.removeItem(SESSION_KEY);
 }
@@ -42,7 +53,7 @@ export function isLoggedIn() {
 
 export function isAdmin() {
   const user = getCurrentUser();
-  return user?.role === 'admin';
+  return user?.role === "admin";
 }
 
 // ─── Login Validation ───
@@ -52,10 +63,11 @@ export async function login(users, username, password) {
 
   // Step 1: Check local credentials (source of truth)
   const hashed = hashPassword(password);
-  const user = users.find(u =>
-    u.username.toLowerCase() === username.toLowerCase().trim() &&
-    u.passwordHash === hashed &&
-    u.active !== false
+  const user = users.find(
+    (u) =>
+      u.username.toLowerCase() === username.toLowerCase().trim() &&
+      u.passwordHash === hashed &&
+      u.active !== false,
   );
 
   if (!user) return null; // Wrong credentials or disabled
@@ -63,7 +75,7 @@ export async function login(users, username, password) {
   // Step 2: Try Firebase Auth (best-effort, don't block login if it fails)
   const auth = getFirebaseAuth();
   if (auth) {
-    const email = username.toLowerCase().trim() + '@chomdoi.local';
+    const email = username.toLowerCase().trim() + "@chomdoi.local";
     try {
       // Try signing in with current password
       const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -72,15 +84,18 @@ export async function login(users, username, password) {
         // Password matches Firebase Auth — all good
       }
     } catch (err) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+      if (
+        err.code === "auth/user-not-found" ||
+        err.code === "auth/invalid-credential"
+      ) {
         // Firebase Auth doesn't have this user, or has stale password
         try {
           await createUserWithEmailAndPassword(auth, email, password);
         } catch (createErr) {
-          if (createErr.code === 'auth/email-already-in-use') {
+          if (createErr.code === "auth/email-already-in-use") {
             // Firebase Auth has old password. Can't sync without admin SDK.
             // Login still proceeds — local hash matched.
-            console.warn('Firebase Auth password out of sync for:', username);
+            console.warn("Firebase Auth password out of sync for:", username);
           }
           // Other errors: just log and continue
         }

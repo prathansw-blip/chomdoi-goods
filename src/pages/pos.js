@@ -1,20 +1,42 @@
 // pos.js — หน้าขายสินค้า (POS)
-import { getProducts, getTransactions, addTransaction, getActiveShift, subscribe, getSettings } from '../data/store.js';
-import { generateId, formatCurrency, formatTime, formatBusinessDate, showToast, getCategoryLabels, getStockStatus, getProductIcon, getBusinessDate } from '../utils/utils.js';
-import { sendLowStockAlert, sendSaleNotification } from '../utils/lineNotify.js';
+import {
+  getProducts,
+  getTransactions,
+  addTransaction,
+  getActiveShift,
+  subscribe,
+  getSettings,
+} from "../data/store.js";
+import {
+  generateId,
+  formatCurrency,
+  formatTime,
+  formatBusinessDate,
+  showToast,
+  getCategoryLabels,
+  getStockStatus,
+  getProductIcon,
+  getBusinessDate,
+} from "../utils/utils.js";
+import {
+  sendLowStockAlert,
+  sendSaleNotification,
+} from "../utils/lineNotify.js";
 
 let cart = [];
-let activeFilter = 'all';
+let activeFilter = "all";
 let unsub = null;
 let _alertedStockIds = new Set(); // throttle: ส่งแค่ครั้งเดียวต่อ session ต่อสินค้า
-let _initialAlertDone = false;   // เช็คครั้งแรกที่เปิดหน้า POS
+let _initialAlertDone = false; // เช็คครั้งแรกที่เปิดหน้า POS
 
 export function renderPOS(container) {
   if (unsub) unsub();
   cart = [];
-  activeFilter = 'all';
+  activeFilter = "all";
   draw(container);
-  unsub = subscribe(() => { if (!document.querySelector('.modal-overlay')) draw(container); });
+  unsub = subscribe(() => {
+    if (!document.querySelector(".modal-overlay")) draw(container);
+  });
 
   // เช็ค stock ต่ำทีแรกเดียว (session)
   if (!_initialAlertDone) {
@@ -26,17 +48,18 @@ export function renderPOS(container) {
 // ส่ง LINE alert เมื่อ stock ต่ำ (ใช้ throttle ไม่ส่งซ้ำต่อ session)
 function checkAndAlertLowStock() {
   const products = getProducts();
-  const newLow = products.filter(p =>
-    p.stock > 0 &&
-    p.stock <= (p.lowStockThreshold || 5) &&
-    !_alertedStockIds.has(p.id)
+  const newLow = products.filter(
+    (p) =>
+      p.stock > 0 &&
+      p.stock <= (p.lowStockThreshold || 5) &&
+      !_alertedStockIds.has(p.id),
   );
   if (newLow.length) {
-    newLow.forEach(p => _alertedStockIds.add(p.id));
+    newLow.forEach((p) => _alertedStockIds.add(p.id));
     sendLowStockAlert(newLow);
   }
   // Reset IDs ถ้า stock เติมใหม่แล้ว (สินค้าที่เคยแจ้งแล้ว stock กลับมา จะแจ้งได้ใหม่)
-  products.forEach(p => {
+  products.forEach((p) => {
     if (p.stock > (p.lowStockThreshold || 5)) _alertedStockIds.delete(p.id);
   });
 }
@@ -44,41 +67,55 @@ function checkAndAlertLowStock() {
 function draw(container) {
   const products = getProducts();
   const settings = getSettings();
-  const currency = settings.currency || '฿';
-  const filtered = activeFilter === 'all' ? products : products.filter(p => p.category === activeFilter);
+  const currency = settings.currency || "฿";
+  const filtered =
+    activeFilter === "all"
+      ? products
+      : products.filter((p) => p.category === activeFilter);
   const cartTotal = cart.reduce((sum, c) => sum + c.subtotal, 0);
 
   container.innerHTML = `
     <div class="pos-layout">
       <div class="pos-products">
         <div class="category-filter">
-          ${Object.entries(getCategoryLabels(settings)).map(([key, label]) =>
-            `<button class="filter-btn ${activeFilter === key ? 'active' : ''}" data-cat="${key}">${label}</button>`
-          ).join('')}
+          ${Object.entries(getCategoryLabels(settings))
+            .map(
+              ([key, label]) =>
+                `<button class="filter-btn ${activeFilter === key ? "active" : ""}" data-cat="${key}">${label}</button>`,
+            )
+            .join("")}
         </div>
         <div class="product-grid">
-          ${filtered.map(p => {
-            const ss = getStockStatus(p);
-            return `
-              <div class="product-card ${p.stock <= 0 ? 'out-of-stock' : ''}" data-id="${p.id}">
-                ${p.photo
-                  ? `<img src="${p.photo}" alt="${p.name}" style="width:56px;height:56px;border-radius:8px;object-fit:cover;margin-bottom:0.4rem">`
-                  : `<div class="product-emoji">${getProductIcon(p, settings)}</div>`
+          ${filtered
+            .map((p) => {
+              const ss = getStockStatus(p);
+              return `
+              <div class="product-card ${p.stock <= 0 ? "out-of-stock" : ""}" data-id="${p.id}">
+                ${
+                  p.photo
+                    ? `<img src="${p.photo}" alt="${p.name}" style="width:56px;height:56px;border-radius:8px;object-fit:cover;margin-bottom:0.4rem">`
+                    : `<div class="product-emoji">${getProductIcon(p, settings)}</div>`
                 }
                 <div class="product-name">${p.name}</div>
                 <div class="product-price">${formatCurrency(p.price, currency)}</div>
                 <div class="product-stock ${ss.class}">${ss.label}</div>
               </div>`;
-          }).join('')}
-          ${filtered.length === 0 ? '<div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-text">ไม่มีสินค้าในหมวดนี้</div></div>' : ''}
+            })
+            .join("")}
+          ${filtered.length === 0 ? '<div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-text">ไม่มีสินค้าในหมวดนี้</div></div>' : ""}
         </div>
       </div>
       <div class="cart-sidebar">
         <div class="cart card">
           <div class="card-header">🧾 ตะกร้า</div>
-          ${cart.length === 0 ? '<div class="cart-empty">ยังไม่มีสินค้าในตะกร้า<br>กดที่สินค้าเพื่อเพิ่ม</div>' : `
+          ${
+            cart.length === 0
+              ? '<div class="cart-empty">ยังไม่มีสินค้าในตะกร้า<br>กดที่สินค้าเพื่อเพิ่ม</div>'
+              : `
             <div class="cart-items">
-              ${cart.map((c, i) => `
+              ${cart
+                .map(
+                  (c, i) => `
                 <div class="cart-item">
                   <div class="cart-item-info">
                     <span>${c.image}</span>
@@ -92,59 +129,84 @@ function draw(container) {
                   <span class="cart-item-subtotal">${formatCurrency(c.subtotal, currency)}</span>
                   <button class="cart-qty-btn" data-action="remove" data-idx="${i}" style="color:var(--red);border-color:var(--red);margin-left:0.3rem;">✕</button>
                 </div>
-              `).join('')}
+              `,
+                )
+                .join("")}
             </div>
             <div class="cart-total">
               <span>รวมทั้งหมด</span>
               <span class="cart-total-amount">${formatCurrency(cartTotal, currency)}</span>
             </div>
             <button class="btn btn-primary btn-lg btn-block" id="btn-confirm-sale" style="margin-top:1rem;">✅ ยืนยันการขาย</button>
-          `}
+          `
+          }
         </div>
         ${buildShiftSummary(settings, currency)}
       </div>
     </div>
   `;
 
-  if (!document.getElementById('pos-style')) {
-    const s = document.createElement('style');
-    s.id = 'pos-style';
+  if (!document.getElementById("pos-style")) {
+    const s = document.createElement("style");
+    s.id = "pos-style";
     s.textContent = `.pos-layout{display:grid;grid-template-columns:1fr 380px;gap:1.25rem;align-items:start}@media(max-width:900px){.pos-layout{grid-template-columns:1fr}.cart-sidebar{position:sticky;bottom:0}}.cart-sidebar{display:flex;flex-direction:column;gap:1rem}.pay-option{display:flex;gap:0.75rem;margin-bottom:1rem}.pay-btn{flex:1;padding:1rem;border-radius:var(--radius);border:2px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:1rem;cursor:pointer;text-align:center;transition:var(--transition);font-family:'Inter',sans-serif}.pay-btn:hover{border-color:var(--gold)}.pay-btn.selected{border-color:var(--gold);background:rgba(245,158,11,0.15)}.pay-btn .pay-icon{font-size:1.5rem;display:block;margin-bottom:0.3rem}.shift-summary-item{display:flex;justify-content:space-between;align-items:center;padding:0.35rem 0;font-size:0.85rem;border-bottom:1px solid rgba(148,163,184,0.1)}.shift-summary-item:last-child{border-bottom:none}`;
     document.head.appendChild(s);
   }
 
-  container.querySelectorAll('.filter-btn').forEach(btn => {
-    btn.onclick = () => { activeFilter = btn.dataset.cat; draw(container); };
-  });
-  container.querySelectorAll('.product-card:not(.out-of-stock)').forEach(card => {
-    card.onclick = () => addToCart(card.dataset.id, container);
-  });
-  container.querySelectorAll('.cart-qty-btn').forEach(btn => {
+  container.querySelectorAll(".filter-btn").forEach((btn) => {
     btn.onclick = () => {
-      const idx = +btn.dataset.idx;
-      if (btn.dataset.action === 'inc') {
-        const p = getProducts().find(x => x.id === cart[idx].productId);
-        if (p && cart[idx].qty < p.stock) { cart[idx].qty++; cart[idx].subtotal = cart[idx].qty * cart[idx].price; }
-        else showToast('สินค้าไม่พอ', 'warning');
-      } else if (btn.dataset.action === 'dec') {
-        cart[idx].qty--; if (cart[idx].qty <= 0) cart.splice(idx, 1); else cart[idx].subtotal = cart[idx].qty * cart[idx].price;
-      } else if (btn.dataset.action === 'remove') { cart.splice(idx, 1); }
+      activeFilter = btn.dataset.cat;
       draw(container);
     };
   });
-  const confirmBtn = document.getElementById('btn-confirm-sale');
+  container
+    .querySelectorAll(".product-card:not(.out-of-stock)")
+    .forEach((card) => {
+      card.onclick = () => addToCart(card.dataset.id, container);
+    });
+  container.querySelectorAll(".cart-qty-btn").forEach((btn) => {
+    btn.onclick = () => {
+      const idx = +btn.dataset.idx;
+      if (btn.dataset.action === "inc") {
+        const p = getProducts().find((x) => x.id === cart[idx].productId);
+        if (p && cart[idx].qty < p.stock) {
+          cart[idx].qty++;
+          cart[idx].subtotal = cart[idx].qty * cart[idx].price;
+        } else showToast("สินค้าไม่พอ", "warning");
+      } else if (btn.dataset.action === "dec") {
+        cart[idx].qty--;
+        if (cart[idx].qty <= 0) cart.splice(idx, 1);
+        else cart[idx].subtotal = cart[idx].qty * cart[idx].price;
+      } else if (btn.dataset.action === "remove") {
+        cart.splice(idx, 1);
+      }
+      draw(container);
+    };
+  });
+  const confirmBtn = document.getElementById("btn-confirm-sale");
   if (confirmBtn) confirmBtn.onclick = () => showPaymentModal(container);
 }
 
 function addToCart(productId, container) {
-  const p = getProducts().find(x => x.id === productId);
+  const p = getProducts().find((x) => x.id === productId);
   if (!p || p.stock <= 0) return;
-  const existing = cart.find(c => c.productId === productId);
+  const existing = cart.find((c) => c.productId === productId);
   if (existing) {
-    if (existing.qty >= p.stock) { showToast('สินค้าไม่พอ', 'warning'); return; }
-    existing.qty++; existing.subtotal = existing.qty * existing.price;
+    if (existing.qty >= p.stock) {
+      showToast("สินค้าไม่พอ", "warning");
+      return;
+    }
+    existing.qty++;
+    existing.subtotal = existing.qty * existing.price;
   } else {
-    cart.push({ productId: p.id, name: p.name, image: getProductIcon(p, getSettings()), qty: 1, price: p.price, subtotal: p.price });
+    cart.push({
+      productId: p.id,
+      name: p.name,
+      image: getProductIcon(p, getSettings()),
+      qty: 1,
+      price: p.price,
+      subtotal: p.price,
+    });
   }
   draw(container);
 }
@@ -152,12 +214,12 @@ function addToCart(productId, container) {
 // ═══ Payment Method Modal ═══
 function showPaymentModal(container) {
   if (cart.length === 0) return;
-  const currency = getSettings().currency || '฿';
+  const currency = getSettings().currency || "฿";
   const total = cart.reduce((s, c) => s + c.subtotal, 0);
-  let selectedMethod = 'cash';
+  let selectedMethod = "cash";
 
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal">
       <div class="modal-title">💳 เลือกวิธีชำระเงิน</div>
@@ -202,41 +264,51 @@ function showPaymentModal(container) {
   `;
   document.body.appendChild(overlay);
 
-  const payBtns = overlay.querySelectorAll('.pay-btn');
-  const freeWrap = overlay.querySelector('#free-reason-wrap');
-  const freeSelect = overlay.querySelector('#free-reason-select');
-  const guestDetail = overlay.querySelector('#free-guest-detail');
-  const otherDetail = overlay.querySelector('#free-other-detail');
+  const payBtns = overlay.querySelectorAll(".pay-btn");
+  const freeWrap = overlay.querySelector("#free-reason-wrap");
+  const freeSelect = overlay.querySelector("#free-reason-select");
+  const guestDetail = overlay.querySelector("#free-guest-detail");
+  const otherDetail = overlay.querySelector("#free-other-detail");
 
-  payBtns.forEach(btn => {
+  payBtns.forEach((btn) => {
     btn.onclick = () => {
-      payBtns.forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
+      payBtns.forEach((b) => b.classList.remove("selected"));
+      btn.classList.add("selected");
       selectedMethod = btn.dataset.method;
-      freeWrap.style.display = selectedMethod === 'free' ? 'block' : 'none';
+      freeWrap.style.display = selectedMethod === "free" ? "block" : "none";
     };
   });
 
   // Show/hide conditional fields based on dropdown selection
   freeSelect.onchange = () => {
     const val = freeSelect.value;
-    guestDetail.style.display = val === 'ให้แขก' ? 'block' : 'none';
-    otherDetail.style.display = val === 'อื่นๆ' ? 'block' : 'none';
+    guestDetail.style.display = val === "ให้แขก" ? "block" : "none";
+    otherDetail.style.display = val === "อื่นๆ" ? "block" : "none";
   };
 
-  overlay.querySelector('#pay-cancel').onclick = () => overlay.remove();
-  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-  overlay.querySelector('#pay-confirm').onclick = () => {
+  overlay.querySelector("#pay-cancel").onclick = () => overlay.remove();
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
+  overlay.querySelector("#pay-confirm").onclick = () => {
     let reason = null;
-    if (selectedMethod === 'free') {
+    if (selectedMethod === "free") {
       const sel = freeSelect.value;
-      if (!sel) { showToast('กรุณาเลือกเหตุผล', 'warning'); return; }
-      if (sel === 'ให้แขก') {
-        const room = document.getElementById('free-room').value.trim();
-        reason = room ? `ให้แขก (ห้อง ${room})` : 'ให้แขก';
-      } else if (sel === 'อื่นๆ') {
-        const otherText = document.getElementById('free-other-text').value.trim();
-        if (!otherText) { showToast('กรุณาระบุเหตุผล', 'warning'); return; }
+      if (!sel) {
+        showToast("กรุณาเลือกเหตุผล", "warning");
+        return;
+      }
+      if (sel === "ให้แขก") {
+        const room = document.getElementById("free-room").value.trim();
+        reason = room ? `ให้แขก (ห้อง ${room})` : "ให้แขก";
+      } else if (sel === "อื่นๆ") {
+        const otherText = document
+          .getElementById("free-other-text")
+          .value.trim();
+        if (!otherText) {
+          showToast("กรุณาระบุเหตุผล", "warning");
+          return;
+        }
         reason = otherText;
       } else {
         reason = sel;
@@ -247,26 +319,35 @@ function showPaymentModal(container) {
   };
 }
 
-function confirmSale(container, paymentMethod = 'cash', freeReason = null) {
+function confirmSale(container, paymentMethod = "cash", freeReason = null) {
   if (cart.length === 0) return;
   const shift = getActiveShift();
   const settings = getSettings();
   const startHour = settings.businessDayStartHour || 8;
   const txn = {
-    id: generateId('txn'),
-    items: cart.map(c => ({ productId: c.productId, name: c.name, qty: c.qty, price: c.price, subtotal: c.subtotal })),
+    id: generateId("txn"),
+    items: cart.map((c) => ({
+      productId: c.productId,
+      name: c.name,
+      qty: c.qty,
+      price: c.price,
+      subtotal: c.subtotal,
+    })),
     total: cart.reduce((s, c) => s + c.subtotal, 0),
     paymentMethod,
     freeReason,
     timestamp: new Date().toISOString(),
     shiftId: shift?.id || null,
-    businessDate: shift?.businessDate || getBusinessDate(new Date(), startHour)
+    businessDate: shift?.businessDate || getBusinessDate(new Date(), startHour),
   };
   addTransaction(txn);
   sendSaleNotification(txn);
   checkAndAlertLowStock();
-  const labels = { cash: '💵 เงินสด', transfer: '📱 เงินโอน', free: '🎁 ฟรี' };
-  showToast(`ขายสำเร็จ — ${formatCurrency(txn.total, getSettings().currency || '฿')} (${labels[paymentMethod]})`, 'success');
+  const labels = { cash: "💵 เงินสด", transfer: "📱 เงินโอน", free: "🎁 ฟรี" };
+  showToast(
+    `ขายสำเร็จ — ${formatCurrency(txn.total, getSettings().currency || "฿")} (${labels[paymentMethod]})`,
+    "success",
+  );
   cart = [];
   draw(container);
 }
@@ -285,23 +366,33 @@ function buildShiftSummary(settings, currency) {
   }
 
   const transactions = getTransactions();
-  const shiftTxns = transactions.filter(t => t.shiftId === active.id);
+  const shiftTxns = transactions.filter((t) => t.shiftId === active.id);
   const startHour = settings.businessDayStartHour || 8;
 
   // Payment breakdown
-  const cash = shiftTxns.filter(t => (t.paymentMethod || 'cash') === 'cash').reduce((s, t) => s + t.total, 0);
-  const transfer = shiftTxns.filter(t => t.paymentMethod === 'transfer').reduce((s, t) => s + t.total, 0);
-  const free = shiftTxns.filter(t => t.paymentMethod === 'free').reduce((s, t) => s + t.total, 0);
+  const cash = shiftTxns
+    .filter((t) => (t.paymentMethod || "cash") === "cash")
+    .reduce((s, t) => s + t.total, 0);
+  const transfer = shiftTxns
+    .filter((t) => t.paymentMethod === "transfer")
+    .reduce((s, t) => s + t.total, 0);
+  const free = shiftTxns
+    .filter((t) => t.paymentMethod === "free")
+    .reduce((s, t) => s + t.total, 0);
   const total = cash + transfer;
 
   // Items sold aggregate
   const itemMap = {};
-  shiftTxns.forEach(t => t.items.forEach(item => {
-    if (!itemMap[item.name]) itemMap[item.name] = { qty: 0, total: 0 };
-    itemMap[item.name].qty += item.qty;
-    itemMap[item.name].total += item.subtotal;
-  }));
-  const sortedItems = Object.entries(itemMap).sort((a, b) => b[1].qty - a[1].qty);
+  shiftTxns.forEach((t) =>
+    t.items.forEach((item) => {
+      if (!itemMap[item.name]) itemMap[item.name] = { qty: 0, total: 0 };
+      itemMap[item.name].qty += item.qty;
+      itemMap[item.name].total += item.subtotal;
+    }),
+  );
+  const sortedItems = Object.entries(itemMap).sort(
+    (a, b) => b[1].qty - a[1].qty,
+  );
 
   return `
     <div class="card">
@@ -311,7 +402,7 @@ function buildShiftSummary(settings, currency) {
           <span style="font-size:0.8rem;color:var(--text-muted)">📅 ${formatBusinessDate(active.businessDate || getBusinessDate(active.startTime, startHour))}</span>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
-          <span style="font-weight:600;color:var(--text-primary)">${active.icon || '⏰'} ${active.name}</span>
+          <span style="font-weight:600;color:var(--text-primary)">${active.icon || "⏰"} ${active.name}</span>
           <span style="font-size:0.85rem;color:var(--text-muted)">เริ่ม ${formatTime(active.startTime)}</span>
         </div>
 
@@ -323,26 +414,39 @@ function buildShiftSummary(settings, currency) {
           <div style="display:flex;gap:0.4rem;flex-wrap:wrap;font-size:0.78rem">
             <span class="badge badge-success">💵 ${formatCurrency(cash, currency)}</span>
             <span class="badge badge-info">📱 ${formatCurrency(transfer, currency)}</span>
-            ${free > 0 ? `<span class="badge badge-warning">🎁 ${formatCurrency(free, currency)}</span>` : ''}
+            ${free > 0 ? `<span class="badge badge-warning">🎁 ${formatCurrency(free, currency)}</span>` : ""}
           </div>
           <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.4rem">${shiftTxns.length} bills</div>
         </div>
 
-        ${sortedItems.length > 0 ? `
+        ${
+          sortedItems.length > 0
+            ? `
           <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.4rem;font-weight:600">🛒 รายการที่ขาย</div>
           <div style="max-height:200px;overflow-y:auto">
-            ${sortedItems.map(([name, data]) => `
+            ${sortedItems
+              .map(
+                ([name, data]) => `
               <div class="shift-summary-item">
                 <span style="color:var(--text-secondary)">${name} <span style="color:var(--text-muted)">×${data.qty}</span></span>
                 <span style="font-weight:600;color:var(--text-primary)">${formatCurrency(data.total, currency)}</span>
               </div>
-            `).join('')}
+            `,
+              )
+              .join("")}
           </div>
-        ` : `
+        `
+            : `
           <div style="text-align:center;padding:0.75rem 0;color:var(--text-muted);font-size:0.85rem">ยังไม่มียอดขาย</div>
-        `}
+        `
+        }
       </div>
     </div>`;
 }
 
-export function destroyPOS() { if (unsub) { unsub(); unsub = null; } }
+export function destroyPOS() {
+  if (unsub) {
+    unsub();
+    unsub = null;
+  }
+}

@@ -1,10 +1,15 @@
 // store.js — Reactive data store
-import { loadData, saveData, subscribeToChanges, unsubscribeAll } from './db.js';
+import {
+  loadData,
+  saveData,
+  subscribeToChanges,
+  unsubscribeAll,
+} from "./db.js";
 
 let state = null;
 let listeners = [];
 let saveTimer = null;
-let lastCommitTime = 0;  // ป้องกัน Firestore revert ทับ local changes
+let lastCommitTime = 0; // ป้องกัน Firestore revert ทับ local changes
 
 // ─── Init ───
 export async function initStore() {
@@ -32,9 +37,9 @@ export async function initStore() {
 function migrateTransactionBusinessDates() {
   if (!state?.transactions || !state?.shifts) return;
   let changed = false;
-  state.transactions.forEach(t => {
+  state.transactions.forEach((t) => {
     if (!t.businessDate && t.shiftId) {
-      const shift = state.shifts.find(s => s.id === t.shiftId);
+      const shift = state.shifts.find((s) => s.id === t.shiftId);
       if (shift?.businessDate) {
         t.businessDate = shift.businessDate;
         changed = true;
@@ -47,20 +52,40 @@ function migrateTransactionBusinessDates() {
 }
 
 // ─── Getters ───
-export function getState() { return state; }
-export function getProducts() { return state?.products || []; }
-export function getTransactions() { return state?.transactions || []; }
-export function getRestockLogs() { return state?.restockLogs || []; }
-export function getShifts() { return state?.shifts || []; }
-export function getSettings() { return state?.settings || {}; }
-export function getUsers() { return state?.users || []; }
+export function getState() {
+  return state;
+}
+export function getProducts() {
+  return state?.products || [];
+}
+export function getTransactions() {
+  return state?.transactions || [];
+}
+export function getRestockLogs() {
+  return state?.restockLogs || [];
+}
+export function getShifts() {
+  return state?.shifts || [];
+}
+export function getSettings() {
+  return state?.settings || {};
+}
+export function getUsers() {
+  return state?.users || [];
+}
 export function getActiveShift() {
-  return (state?.shifts || []).find(s => s.status === 'active') || null;
+  return (state?.shifts || []).find((s) => s.status === "active") || null;
 }
 // Hotel Supplies
-export function getHotelSupplies() { return state?.hotelSupplies || []; }
-export function getSupplyChecks() { return state?.supplyChecks || []; }
-export function getSupplyRestocks() { return state?.supplyRestocks || []; }
+export function getHotelSupplies() {
+  return state?.hotelSupplies || [];
+}
+export function getSupplyChecks() {
+  return state?.supplyChecks || [];
+}
+export function getSupplyRestocks() {
+  return state?.supplyRestocks || [];
+}
 
 // ─── Mutations (auto-save) ───
 function commit() {
@@ -72,8 +97,11 @@ function commit() {
 
 // Products
 export function updateProductStock(productId, newStock) {
-  const p = state.products.find(x => x.id === productId);
-  if (p) { p.stock = Math.max(0, newStock); commit(); }
+  const p = state.products.find((x) => x.id === productId);
+  if (p) {
+    p.stock = Math.max(0, newStock);
+    commit();
+  }
 }
 
 export function addProduct(product) {
@@ -82,12 +110,15 @@ export function addProduct(product) {
 }
 
 export function updateProduct(productId, updates) {
-  const idx = state.products.findIndex(x => x.id === productId);
-  if (idx !== -1) { Object.assign(state.products[idx], updates); commit(); }
+  const idx = state.products.findIndex((x) => x.id === productId);
+  if (idx !== -1) {
+    Object.assign(state.products[idx], updates);
+    commit();
+  }
 }
 
 export function deleteProduct(productId) {
-  state.products = state.products.filter(x => x.id !== productId);
+  state.products = state.products.filter((x) => x.id !== productId);
   commit();
 }
 
@@ -100,13 +131,16 @@ export function addUser(user) {
 
 export function updateUser(userId, updates) {
   if (!state.users) return;
-  const idx = state.users.findIndex(x => x.id === userId);
-  if (idx !== -1) { Object.assign(state.users[idx], updates); commit(); }
+  const idx = state.users.findIndex((x) => x.id === userId);
+  if (idx !== -1) {
+    Object.assign(state.users[idx], updates);
+    commit();
+  }
 }
 
 export function deleteUser(userId) {
   if (!state.users) return;
-  state.users = state.users.filter(x => x.id !== userId);
+  state.users = state.users.filter((x) => x.id !== userId);
   commit();
 }
 
@@ -114,9 +148,11 @@ export function deleteUser(userId) {
 export function addTransaction(txn) {
   state.transactions.push(txn);
   // Deduct stock
-  txn.items.forEach(item => {
-    updateProductStock(item.productId, 
-      (state.products.find(p => p.id === item.productId)?.stock || 0) - item.qty
+  txn.items.forEach((item) => {
+    updateProductStock(
+      item.productId,
+      (state.products.find((p) => p.id === item.productId)?.stock || 0) -
+        item.qty,
     );
   });
   commit();
@@ -125,29 +161,41 @@ export function addTransaction(txn) {
 // Restock
 export function addRestockLog(log) {
   state.restockLogs.push(log);
-  const p = state.products.find(x => x.id === log.productId);
-  if (p) { p.stock += log.quantity; }
+  const p = state.products.find((x) => x.id === log.productId);
+  if (p) {
+    p.stock += log.quantity;
+  }
   commit();
 }
 
 // Shifts
 export function startShift(shift) {
   // Close any active shift first
-  state.shifts.forEach(s => { if (s.status === 'active') { s.status = 'closed'; s.endTime = new Date().toISOString(); }});
+  state.shifts.forEach((s) => {
+    if (s.status === "active") {
+      s.status = "closed";
+      s.endTime = new Date().toISOString();
+    }
+  });
   state.shifts.push(shift);
   commit();
 }
 
 export function closeShift(shiftId, closedBy = null) {
-  const s = state.shifts.find(x => x.id === shiftId);
-  if (s) { s.status = 'closed'; s.endTime = new Date().toISOString(); if (closedBy) s.closedBy = closedBy; commit(); }
+  const s = state.shifts.find((x) => x.id === shiftId);
+  if (s) {
+    s.status = "closed";
+    s.endTime = new Date().toISOString();
+    if (closedBy) s.closedBy = closedBy;
+    commit();
+  }
   return s;
 }
 
 export function deleteShift(shiftId) {
   // ลบ shift + transactions ที่ผูกกับ shift นี้
-  state.shifts = state.shifts.filter(x => x.id !== shiftId);
-  state.transactions = state.transactions.filter(t => t.shiftId !== shiftId);
+  state.shifts = state.shifts.filter((x) => x.id !== shiftId);
+  state.transactions = state.transactions.filter((t) => t.shiftId !== shiftId);
   commit();
 }
 
@@ -166,13 +214,16 @@ export function addHotelSupply(supply) {
 
 export function updateHotelSupply(supplyId, updates) {
   if (!state.hotelSupplies) return;
-  const idx = state.hotelSupplies.findIndex(x => x.id === supplyId);
-  if (idx !== -1) { Object.assign(state.hotelSupplies[idx], updates); commit(); }
+  const idx = state.hotelSupplies.findIndex((x) => x.id === supplyId);
+  if (idx !== -1) {
+    Object.assign(state.hotelSupplies[idx], updates);
+    commit();
+  }
 }
 
 export function deleteHotelSupply(supplyId) {
   if (!state.hotelSupplies) return;
-  state.hotelSupplies = state.hotelSupplies.filter(x => x.id !== supplyId);
+  state.hotelSupplies = state.hotelSupplies.filter((x) => x.id !== supplyId);
   commit();
 }
 
@@ -191,9 +242,17 @@ export function addSupplyRestock(log) {
 // ─── Listeners ───
 export function subscribe(fn) {
   listeners.push(fn);
-  return () => { listeners = listeners.filter(l => l !== fn); };
+  return () => {
+    listeners = listeners.filter((l) => l !== fn);
+  };
 }
 
 function notifyAll() {
-  listeners.forEach(fn => { try { fn(state); } catch(e) { console.error(e); }});
+  listeners.forEach((fn) => {
+    try {
+      fn(state);
+    } catch (e) {
+      console.error(e);
+    }
+  });
 }
