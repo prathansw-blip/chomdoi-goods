@@ -161,6 +161,54 @@ export function addTransaction(txn) {
   commit();
 }
 
+export function deleteTransaction(transactionId) {
+  if (!state.transactions) return false;
+  const txn = state.transactions.find((t) => t.id === transactionId);
+  if (!txn) return false;
+
+  // Restore stock
+  if (txn.items && Array.isArray(txn.items)) {
+    txn.items.forEach((item) => {
+      const p = state.products.find((x) => x.id === item.productId || x.name === item.name);
+      if (p) {
+        p.stock = (p.stock || 0) + (item.qty || 0);
+      }
+    });
+  }
+
+  state.transactions = state.transactions.filter((t) => t.id !== transactionId);
+  commit();
+  return true;
+}
+
+export function deleteTransactionItem(transactionId, itemIndex) {
+  if (!state.transactions) return false;
+  const txn = state.transactions.find((t) => t.id === transactionId);
+  if (!txn || !txn.items || !txn.items[itemIndex]) return false;
+
+  const item = txn.items[itemIndex];
+
+  // Restore product stock
+  const p = state.products.find((x) => x.id === item.productId || x.name === item.name);
+  if (p) {
+    p.stock = (p.stock || 0) + (item.qty || 0);
+  }
+
+  // Update total
+  txn.total = Math.max(0, (txn.total || 0) - (item.subtotal || 0));
+
+  // Remove item
+  txn.items.splice(itemIndex, 1);
+
+  // If transaction has no items left, remove transaction
+  if (txn.items.length === 0) {
+    state.transactions = state.transactions.filter((t) => t.id !== transactionId);
+  }
+
+  commit();
+  return true;
+}
+
 // Restock
 export function addRestockLog(log) {
   state.restockLogs.push(log);
@@ -232,8 +280,21 @@ export function deleteHotelSupply(supplyId) {
 
 export function addSupplyCheck(check) {
   if (!state.supplyChecks) state.supplyChecks = [];
-  state.supplyChecks.push(check);
+  // Replace existing if date matches or push
+  const idx = state.supplyChecks.findIndex((c) => c.date === check.date);
+  if (idx !== -1) {
+    state.supplyChecks[idx] = check;
+  } else {
+    state.supplyChecks.push(check);
+  }
   commit();
+}
+
+export function deleteSupplyCheck(dateStr) {
+  if (!state.supplyChecks) return false;
+  state.supplyChecks = state.supplyChecks.filter((c) => c.date !== dateStr);
+  commit();
+  return true;
 }
 
 export function addSupplyRestock(log) {

@@ -1311,3 +1311,166 @@ body.modal-open .page-content {
   background: rgba(59, 130, 246, 0.15);
   color: var(--blue);
 }
+
+/* ═══ RESPONSIVE MOBILE STYLES ═══ */
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+  .header-brand {
+    gap: 0.4rem;
+  }
+  .header-logo,
+  .header-logo-placeholder {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+  .header-company {
+    font-size: 1.05rem;
+    white-space: nowrap;
+  }
+  .header-shift {
+    order: 3;
+    width: 100%;
+    font-size: 0.72rem;
+    padding: 0.25rem 0.5rem;
+    justify-content: center;
+    margin-top: 0.1rem;
+    background: rgba(15, 23, 42, 0.6);
+  }
+  .header-actions {
+    gap: 0.4rem;
+  }
+  .header-user {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+  }
+  .header-user-avatar {
+    width: 22px;
+    height: 22px;
+    font-size: 0.65rem;
+  }
+  .btn-logout {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .tab-nav {
+    justify-content: flex-start;
+  }
+  .tab-btn {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.72rem;
+    min-width: 60px;
+  }
+  .tab-btn .tab-icon {
+    font-size: 1.1rem;
+  }
+
+  .page-content {
+    padding: 0.75rem 0.75rem 5.5rem 0.75rem;
+  }
+  .page-title {
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Stat cards grid 2x2 on phone */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+    margin-bottom: 1rem !important;
+  }
+  .stat-card {
+    padding: 0.8rem 0.7rem !important;
+  }
+  .stat-label {
+    font-size: 0.72rem !important;
+    margin-bottom: 0.2rem !important;
+  }
+  .stat-value {
+    font-size: 1.25rem !important;
+  }
+  .stat-icon {
+    font-size: 1.2rem !important;
+  }
+
+  /* Modals on mobile -> Native Bottom Sheet */
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modal {
+    padding: 1.25rem 1rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 85vh !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-top-left-radius: var(--radius-lg) !important;
+    border-top-right-radius: var(--radius-lg) !important;
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+  .modal-title {
+    font-size: 1.1rem !important;
+  }
+  .modal-actions {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+  .modal-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Category filters horizontal touch scroll */
+  .category-filter {
+    gap: 0.4rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scrollbar-width: none;
+  }
+  .category-filter::-webkit-scrollbar {
+    display: none;
+  }
+  .filter-btn {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  /* Tables on mobile */
+  .table th,
+  .table td {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.8rem;
+  }
+  .table-wrap {
+    border-radius: var(--radius-sm);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Forms & Buttons on mobile */
+  .btn {
+    padding: 0.55rem 0.85rem;
+    font-size: 0.82rem;
+  }
+  .btn-lg {
+    padding: 0.7rem 1rem;
+    font-size: 0.9rem;
+  }
+  .form-input,
+  .form-select {
+    padding: 0.6rem 0.85rem;
+    font-size: 0.88rem;
+  }
+  .card {
+    padding: 1rem;
+  }
+}

@@ -418,14 +418,22 @@ function draw(container) {
       <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">เพิ่ม / ลบ / แก้ไข ผู้ใช้ — User ทั่วไปไม่เห็นหน้าตั้งค่า</p>
       <div class="table-wrap">
         <table class="table">
-          <thead><tr><th>ชื่อ</th><th>Username</th><th>บทบาท</th><th>สถานะ</th><th style="width:100px"></th></tr></thead>
+          <thead><tr><th>ชื่อ</th><th>Username</th><th>Password</th><th>บทบาท</th><th>สถานะ</th><th style="width:100px"></th></tr></thead>
           <tbody>
             ${getUsers()
               .map(
-                (u) => `
+                (u) => {
+                  const pwVal = u.plainPassword || u.password || (u.id === "user_admin" ? "admin1234" : "");
+                  return `
               <tr>
                 <td>${u.displayName}</td>
                 <td style="color:var(--text-muted);font-size:0.85rem">${u.username}</td>
+                <td>
+                  <div style="display:inline-flex;align-items:center;gap:0.35rem">
+                    <span class="user-pw-text" data-uid="${u.id}" data-pw="${pwVal}" style="font-family:monospace;font-size:0.85rem;color:var(--text-muted)">••••••••</span>
+                    <button class="btn btn-outline btn-toggle-show-pw" data-uid="${u.id}" style="padding:0.15rem 0.45rem;font-size:0.75rem;line-height:1" title="ดู/ซ่อน Password">👁️</button>
+                  </div>
+                </td>
                 <td><span class="user-role-badge ${u.role === "admin" ? "user-role-admin" : "user-role-user"}">${u.role === "admin" ? "⭐ Admin" : "👤 User"}</span></td>
                 <td><span style="color:${u.active !== false ? "var(--emerald)" : "var(--red)"}">${u.active !== false ? "✅ ใช้งาน" : "⛔ ปิดใช้"}</span></td>
                 <td style="display:flex;gap:0.4rem">
@@ -433,7 +441,8 @@ function draw(container) {
                   ${u.id !== "user_admin" ? `<button class="btn btn-outline btn-del-user" data-uid="${u.id}" style="padding:0.3rem 0.6rem;font-size:0.8rem;color:var(--red)">✕</button>` : ""}
                 </td>
               </tr>
-            `,
+            `;
+                },
               )
               .join("")}
           </tbody>
@@ -571,6 +580,26 @@ function draw(container) {
   if (addUserBtn) addUserBtn.onclick = () => showUserModal(container);
   container.querySelectorAll(".btn-edit-user").forEach((btn) => {
     btn.onclick = () => showUserModal(container, btn.dataset.uid);
+  });
+  container.querySelectorAll(".btn-toggle-show-pw").forEach((btn) => {
+    btn.onclick = () => {
+      const uid = btn.dataset.uid;
+      const span = container.querySelector(`.user-pw-text[data-uid="${uid}"]`);
+      if (!span) return;
+      const isHidden = span.dataset.shown !== "true";
+      if (isHidden) {
+        const pw = span.dataset.pw;
+        span.textContent = pw || "(ยังไม่ได้ตั้งใหม่)";
+        span.style.color = pw ? "var(--gold)" : "var(--red)";
+        span.dataset.shown = "true";
+        btn.textContent = "🙈";
+      } else {
+        span.textContent = "••••••••";
+        span.style.color = "var(--text-muted)";
+        span.dataset.shown = "false";
+        btn.textContent = "👁️";
+      }
+    };
   });
   container.querySelectorAll(".btn-del-user").forEach((btn) => {
     btn.onclick = () => {
@@ -783,6 +812,7 @@ function showUserModal(container, editId = null) {
   const existing = editId ? users.find((u) => u.id === editId) : null;
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
+  const existingPw = existing?.plainPassword || existing?.password || (existing?.id === "user_admin" ? "admin1234" : "");
   overlay.innerHTML = `
     <div class="modal" style="max-width:440px">
       <div class="modal-title">${existing ? "✏️ แก้ไขผู้ใช้" : "➕ เพิ่มผู้ใช้ใหม่"}</div>
@@ -795,8 +825,11 @@ function showUserModal(container, editId = null) {
         <input class="form-input" id="um-username" value="${existing?.username || ""}" placeholder="เช่น somchai" ${existing?.id === "user_admin" ? "disabled" : ""}>
       </div>
       <div class="form-group">
-        <label class="form-label">${existing ? "Password ใหม่ (เว้นว่างถ้าไม่เปลี่ยน)" : "Password"}</label>
-        <input class="form-input" id="um-password" type="password" placeholder="${existing ? "เว้นว่างถ้าไม่เปลี่ยน" : "กำหนด password"}">
+        <label class="form-label">${existing ? "Password (เว้นว่างถ้าไม่เปลี่ยน)" : "Password"}</label>
+        <div style="position:relative">
+          <input class="form-input" id="um-password" type="password" value="${existingPw}" placeholder="${existing ? "เว้นว่างถ้าไม่เปลี่ยน" : "กำหนด password"}" style="padding-right:3rem">
+          <button type="button" id="um-toggle-pw" style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--text-muted)" title="ดู/ซ่อน Password">👁️</button>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">บทบาท</label>
@@ -825,6 +858,16 @@ function showUserModal(container, editId = null) {
     </div>
   `;
   document.body.appendChild(overlay);
+
+  const pwInput = overlay.querySelector("#um-password");
+  const pwToggle = overlay.querySelector("#um-toggle-pw");
+  if (pwToggle && pwInput) {
+    pwToggle.onclick = () => {
+      const isPw = pwInput.type === "password";
+      pwInput.type = isPw ? "text" : "password";
+      pwToggle.textContent = isPw ? "🙈" : "👁️";
+    };
+  }
 
   const showErr = (msg) => {
     const el = overlay.querySelector("#um-error");
@@ -870,7 +913,11 @@ function showUserModal(container, editId = null) {
         const updates = { displayName, role, active: activeVal !== "false" };
         if (username && username !== existing.username.toLowerCase())
           updates.username = username;
-        if (password) updates.passwordHash = hashPassword(password);
+        if (password) {
+          updates.passwordHash = hashPassword(password);
+          updates.plainPassword = password;
+          updates.password = password;
+        }
         updateUser(existing.id, updates);
         showToast(`อัปเดต ${displayName} สำเร็จ`, "success");
       } else {
@@ -895,6 +942,8 @@ function showUserModal(container, editId = null) {
           username,
           displayName,
           passwordHash: hashPassword(password),
+          plainPassword: password,
+          password: password,
           role,
           active: true,
           createdAt: new Date().toISOString(),

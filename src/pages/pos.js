@@ -3,10 +3,13 @@ import {
   getProducts,
   getTransactions,
   addTransaction,
+  deleteTransaction,
+  deleteTransactionItem,
   getActiveShift,
   subscribe,
   getSettings,
 } from "../data/store.js";
+import { isAdmin } from "../utils/auth.js";
 import {
   generateId,
   formatCurrency,
@@ -144,12 +147,21 @@ function draw(container) {
         ${buildShiftSummary(settings, currency)}
       </div>
     </div>
+    <div class="mobile-cart-bar" id="mobile-cart-bar">
+      <div class="mobile-cart-info" id="mobile-cart-bar-info">
+        <div style="font-size:0.75rem;color:var(--text-muted)">🛒 ตะกร้าสินค้า (${cart.reduce((sum, c) => sum + c.qty, 0)} รายการ)</div>
+        <div style="font-size:1.1rem;font-weight:700;color:var(--gold)">${formatCurrency(cartTotal, currency)}</div>
+      </div>
+      <button class="btn btn-primary" id="mobile-cart-bar-btn" style="padding:0.55rem 1rem;font-size:0.85rem">
+        ${cart.length > 0 ? "💳 ชำระเงิน / ดูตะกร้า ➔" : "📊 ดูสรุปกะ ➔"}
+      </button>
+    </div>
   `;
 
   if (!document.getElementById("pos-style")) {
     const s = document.createElement("style");
     s.id = "pos-style";
-    s.textContent = `.pos-layout{display:grid;grid-template-columns:1fr 380px;gap:1.25rem;align-items:start}@media(max-width:900px){.pos-layout{grid-template-columns:1fr}.cart-sidebar{position:sticky;bottom:0}}.cart-sidebar{display:flex;flex-direction:column;gap:1rem}.pay-option{display:flex;gap:0.75rem;margin-bottom:1rem}.pay-btn{flex:1;padding:1rem;border-radius:var(--radius);border:2px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:1rem;cursor:pointer;text-align:center;transition:var(--transition);font-family:'Inter',sans-serif}.pay-btn:hover{border-color:var(--gold)}.pay-btn.selected{border-color:var(--gold);background:rgba(245,158,11,0.15)}.pay-btn .pay-icon{font-size:1.5rem;display:block;margin-bottom:0.3rem}.shift-summary-item{display:flex;justify-content:space-between;align-items:center;padding:0.35rem 0;font-size:0.85rem;border-bottom:1px solid rgba(148,163,184,0.1)}.shift-summary-item:last-child{border-bottom:none}`;
+    s.textContent = `.pos-layout{display:grid;grid-template-columns:1fr 380px;gap:1.25rem;align-items:start}.cart-sidebar{display:flex;flex-direction:column;gap:1rem}.mobile-cart-bar{display:none}.pay-option{display:flex;gap:0.75rem;margin-bottom:1rem}.pay-btn{flex:1;padding:1rem;border-radius:var(--radius);border:2px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:1rem;cursor:pointer;text-align:center;transition:var(--transition);font-family:'Inter',sans-serif}.pay-btn:hover{border-color:var(--gold)}.pay-btn.selected{border-color:var(--gold);background:rgba(245,158,11,0.15)}.pay-btn .pay-icon{font-size:1.5rem;display:block;margin-bottom:0.3rem}.shift-summary-item{display:flex;justify-content:space-between;align-items:center;padding:0.35rem 0;font-size:0.85rem;border-bottom:1px solid rgba(148,163,184,0.1)}.shift-summary-item:last-child{border-bottom:none}@media(max-width:900px){.pos-layout{grid-template-columns:1fr;gap:1rem}.cart-sidebar{position:static!important;margin-top:1rem}.product-grid{grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:0.75rem}.product-card{padding:0.75rem 0.5rem}.product-emoji{font-size:1.8rem;margin-bottom:0.25rem}.product-name{font-size:0.85rem}.product-price{font-size:1rem;margin-bottom:0.25rem}.mobile-cart-bar{display:flex;align-items:center;justify-content:space-between;position:fixed;bottom:12px;left:12px;right:12px;background:var(--bg-card);border:2px solid var(--gold);border-radius:var(--radius);padding:0.6rem 0.85rem;box-shadow:0 8px 32px rgba(0,0,0,0.6);z-index:99;backdrop-filter:blur(12px)}}`;
     document.head.appendChild(s);
   }
 
@@ -185,6 +197,44 @@ function draw(container) {
   });
   const confirmBtn = document.getElementById("btn-confirm-sale");
   if (confirmBtn) confirmBtn.onclick = () => showPaymentModal(container);
+
+  container.querySelectorAll(".btn-del-txn").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const txnId = btn.dataset.txnid;
+      showDeleteTxnModal(txnId, container);
+    };
+  });
+
+  container.querySelectorAll(".btn-del-single-subitem").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const txnId = btn.dataset.txnid;
+      const itemIdx = +btn.dataset.itemidx;
+      const itemName = btn.dataset.itemname || "";
+      const itemQty = btn.dataset.itemqty || 1;
+      const confirmDel = confirm(
+        `ต้องการลบรายการ "${itemName} ×${itemQty}" ออกจากบิลนี้?\n(ระบบจะคืนสินค้าเข้า Stock และหักยอดขายออก)`,
+      );
+      if (confirmDel) {
+        deleteTransactionItem(txnId, itemIdx);
+        showToast(`ลบ "${itemName}" ออกจากบิลและคืน Stock เรียบร้อย`, "success");
+        draw(container);
+      }
+    };
+  });
+
+  const mobileBar = document.getElementById("mobile-cart-bar");
+  if (mobileBar) {
+    mobileBar.onclick = () => {
+      if (cart.length > 0) {
+        showPaymentModal(container);
+      } else {
+        const sidebar = container.querySelector(".cart-sidebar");
+        if (sidebar) sidebar.scrollIntoView({ behavior: "smooth" });
+      }
+    };
+  }
 }
 
 function addToCart(productId, container) {
@@ -420,19 +470,49 @@ function buildShiftSummary(settings, currency) {
         </div>
 
         ${
-          sortedItems.length > 0
+          shiftTxns.length > 0
             ? `
-          <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.4rem;font-weight:600">🛒 รายการที่ขาย</div>
-          <div style="max-height:200px;overflow-y:auto">
-            ${sortedItems
-              .map(
-                ([name, data]) => `
-              <div class="shift-summary-item">
-                <span style="color:var(--text-secondary)">${name} <span style="color:var(--text-muted)">×${data.qty}</span></span>
-                <span style="font-weight:600;color:var(--text-primary)">${formatCurrency(data.total, currency)}</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem">
+            <span style="font-size:0.82rem;color:var(--text-muted);font-weight:600">🛒 รายการที่ขายในกะ</span>
+            <span style="font-size:0.75rem;color:var(--text-muted)">ล่าสุดอยู่บน</span>
+          </div>
+          <div style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:0.45rem">
+            ${shiftTxns
+              .slice()
+              .reverse()
+              .map((t) => {
+                const isMulti = t.items.length > 1;
+                return `
+              <div class="shift-summary-item-card" data-txnid="${t.id}" style="background:var(--bg-input);border-radius:var(--radius-sm);padding:0.5rem 0.6rem;border:1px solid rgba(148,163,184,0.12)">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${isMulti ? "0.35rem" : "0.2rem"}">
+                  <div style="font-size:0.75rem;color:var(--text-muted)">
+                    ⏰ ${formatTime(t.timestamp)} · ${t.paymentMethod === "cash" ? "💵 สด" : t.paymentMethod === "transfer" ? "📱 โอน" : "🎁 ฟรี"}
+                  </div>
+                  <div style="display:flex;align-items:center;gap:0.35rem">
+                    <span style="font-weight:700;font-size:0.88rem;color:var(--gold)">${formatCurrency(t.total, currency)}</span>
+                    <button class="btn btn-outline btn-del-txn" data-txnid="${t.id}" style="padding:0.15rem 0.4rem;font-size:0.75rem;color:var(--red);line-height:1" title="จัดการ / ลบบิลนี้">🗑️</button>
+                  </div>
+                </div>
+                
+                <!-- Sub-items list -->
+                <div style="display:flex;flex-direction:column;gap:0.25rem">
+                  ${t.items
+                    .map(
+                      (item, itemIdx) => `
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;background:rgba(255,255,255,0.03);padding:0.25rem 0.45rem;border-radius:4px">
+                      <span style="color:var(--text-secondary)">${item.name} <strong style="color:var(--gold)">×${item.qty}</strong></span>
+                      <div style="display:flex;align-items:center;gap:0.35rem">
+                        <span style="color:var(--text-muted);font-size:0.75rem">${formatCurrency(item.subtotal, currency)}</span>
+                        <button class="btn-del-single-subitem" data-txnid="${t.id}" data-itemidx="${itemIdx}" data-itemname="${item.name}" data-itemqty="${item.qty}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.85rem;padding:0 0.15rem;line-height:1" title="ลบเฉพาะ ${item.name} ×${item.qty}">✕</button>
+                      </div>
+                    </div>
+                  `,
+                    )
+                    .join("")}
+                </div>
               </div>
-            `,
-              )
+            `;
+              })
               .join("")}
           </div>
         `
@@ -442,6 +522,108 @@ function buildShiftSummary(settings, currency) {
         }
       </div>
     </div>`;
+}
+
+function showDeleteTxnModal(txnId, container) {
+  const transactions = getTransactions();
+  const txn = transactions.find((t) => t.id === txnId);
+  if (!txn) return;
+
+  const currency = getSettings().currency || "฿";
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+
+  const renderModalContent = () => {
+    const currentTxn = getTransactions().find((t) => t.id === txnId);
+    if (!currentTxn || !currentTxn.items || currentTxn.items.length === 0) {
+      overlay.remove();
+      if (container) draw(container);
+      return;
+    }
+
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:460px;max-height:85vh;overflow-y:auto">
+        <div class="modal-title" style="color:var(--gold)">🧾 รายละเอียด / จัดการบิล</div>
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.75rem">
+          เวลา ${formatTime(currentTxn.timestamp)} · ${currentTxn.paymentMethod === "cash" ? "💵 เงินสด" : currentTxn.paymentMethod === "transfer" ? "📱 เงินโอน" : "🎁 ฟรี"}
+        </div>
+        
+        <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin-bottom:0.4rem">รายการสินค้าในบิลนี้:</div>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;margin-bottom:1rem">
+          ${currentTxn.items
+            .map(
+              (item, idx) => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0.75rem;background:var(--bg-input);border-radius:var(--radius-sm);border:1px solid rgba(148,163,184,0.1)">
+              <div style="flex:1;min-width:0;margin-right:0.5rem">
+                <div style="font-weight:600;color:var(--text-primary);font-size:0.88rem">${item.name} <span style="color:var(--gold)">×${item.qty}</span></div>
+                <div style="font-size:0.75rem;color:var(--text-muted)">ชิ้นละ ${formatCurrency(item.price, currency)} · รวม ${formatCurrency(item.subtotal, currency)}</div>
+              </div>
+              <button class="btn btn-outline btn-del-subitem" data-idx="${idx}" style="padding:0.25rem 0.55rem;font-size:0.75rem;color:var(--red);border-color:rgba(239,68,68,0.3)" title="ลบเฉพาะรายการนี้ (คืน Stock)">🗑️ ลบเฉพาะรายการนี้</button>
+            </div>
+          `,
+            )
+            .join("")}
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0.75rem;background:rgba(245,158,11,0.08);border-radius:var(--radius-sm);margin-bottom:1rem">
+          <span style="font-size:0.88rem;color:var(--text-muted)">ยอดรวมบิล</span>
+          <span style="font-size:1.15rem;font-weight:700;color:var(--gold)">${formatCurrency(currentTxn.total, currency)}</span>
+        </div>
+
+        <div class="modal-actions" style="justify-content:space-between;gap:0.5rem;flex-wrap:wrap">
+          <button class="btn btn-danger" id="deltxn-whole" style="font-size:0.82rem">🗑️ ลบทั้งบิล</button>
+          <button class="btn btn-outline" id="deltxn-close">ปิด</button>
+        </div>
+      </div>
+    `;
+
+    // Bind event for sub-item delete
+    overlay.querySelectorAll(".btn-del-subitem").forEach((btn) => {
+      btn.onclick = () => {
+        const idx = +btn.dataset.idx;
+        const itemName = currentTxn.items[idx]?.name || "";
+        const itemQty = currentTxn.items[idx]?.qty || 1;
+        const confirmDel = confirm(
+          `ต้องการลบรายการ "${itemName} ×${itemQty}" ออกจากบิลนี้?\n(ระบบจะคืนสินค้าเข้า Stock และหักยอดขายออก)`,
+        );
+        if (confirmDel) {
+          deleteTransactionItem(txnId, idx);
+          showToast(`ลบ "${itemName}" ออกจากบิลและคืน Stock เรียบร้อย`, "success");
+          renderModalContent();
+          if (container) draw(container);
+        }
+      };
+    });
+
+    const wholeBtn = overlay.querySelector("#deltxn-whole");
+    if (wholeBtn) {
+      wholeBtn.onclick = () => {
+        const confirmDelAll = confirm(
+          `ต้องการลบทั้งบิลนี้? (รวม ${formatCurrency(currentTxn.total, currency)})\nสินค้าทุกรายการจะถูกคืนเข้า Stock`,
+        );
+        if (confirmDelAll) {
+          deleteTransaction(txnId);
+          showToast("ลบรายการขายทั้งบิลและคืนสินค้าเข้า Stock เรียบร้อย", "success");
+          overlay.remove();
+          if (container) draw(container);
+        }
+      };
+    }
+
+    overlay.querySelector("#deltxn-close").onclick = () => {
+      overlay.remove();
+      if (container) draw(container);
+    };
+  };
+
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+      if (container) draw(container);
+    }
+  };
+  renderModalContent();
 }
 
 export function destroyPOS() {

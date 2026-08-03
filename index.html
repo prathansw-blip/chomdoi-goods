@@ -5,12 +5,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Chomdoi Goods — ระบบ POS ขายของหน้าเคาน์เตอร์โรงแรม">
   <title>Chomdoi Goods — Hotel Counter POS</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏨</text></svg>">
+  <link id="app-favicon" rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏨</text></svg>">
+  <style>
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 0.8; }
+    }
+  </style>
+  <script>
+    (function() {
+      function applyEarlyLogo() {
+        try {
+          var raw = localStorage.getItem("chomdoi_goods_data");
+          if (!raw) return;
+          var data = JSON.parse(raw);
+          var logo = data && data.settings && data.settings.companyLogo;
+          if (!logo) return;
+
+          // 1. Update Favicon
+          var fav = document.getElementById("app-favicon");
+          if (fav) {
+            fav.removeAttribute("type");
+            fav.href = logo;
+            if (logo.indexOf("data:image/png") === 0) fav.type = "image/png";
+            else if (logo.indexOf("data:image/jpeg") === 0 || logo.indexOf("data:image/jpg") === 0) fav.type = "image/jpeg";
+            else if (logo.indexOf("data:image/svg") === 0) fav.type = "image/svg+xml";
+          }
+
+          // 2. Update Loading screen logo
+          var iconBox = document.getElementById("loading-logo-box");
+          if (iconBox) {
+            iconBox.innerHTML = '<img src="' + logo + '" style="max-width:100px;max-height:100px;object-fit:contain;animation:pulse 1.5s infinite;border-radius:12px">';
+          }
+        } catch(e) {}
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", applyEarlyLogo);
+      } else {
+        applyEarlyLogo();
+      }
+    })();
+  </script>
 </head>
 <body>
   <div id="app">
     <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:1rem">
-      <div style="font-size:3rem;animation:pulse 1.5s infinite">🏨</div>
+      <div id="loading-logo-box" style="display:flex;align-items:center;justify-content:center;min-height:100px">
+        <div style="font-size:3rem;animation:pulse 1.5s infinite">🏨</div>
+      </div>
       <div style="color:#94a3b8;font-family:sans-serif">กำลังโหลด...</div>
     </div>
   </div>

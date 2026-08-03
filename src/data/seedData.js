@@ -150,6 +150,8 @@ export function createDefaultUsers() {
       username: "admin",
       displayName: "Admin",
       passwordHash: hashPassword("admin1234"),
+      plainPassword: "admin1234",
+      password: "admin1234",
       role: "admin",
       active: true,
       createdAt: new Date().toISOString(),

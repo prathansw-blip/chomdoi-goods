@@ -1,5 +1,6 @@
 // auth.js — Authentication & Session Management
-import { getFirebaseAuth } from "../data/db.js";
+import { getFirebaseAuth, loadData } from "../data/db.js";
+import { getUsers } from "../data/store.js";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -59,53 +60,88 @@ export function isAdmin() {
 // ─── Login Validation ───
 // Local hash is the source of truth. Firebase Auth is best-effort for Firestore access.
 export async function login(users, username, password) {
-  if (!users || users.length === 0) return null;
+  if (!username || !password) return null;
 
-  // Step 1: Check local credentials (source of truth)
-  const hashed = hashPassword(password);
-  const user = users.find(
-    (u) =>
-      u.username.toLowerCase() === username.toLowerCase().trim() &&
-      u.passwordHash === hashed &&
-      u.active !== false,
-  );
+  const cleanUsername = username.toLowerCase().trim();
+  const cleanPassword = password.trim();
+  const rawPassword = password;
+
+  const matchesUser = (u) => {
+    if (!u || u.active === false) return false;
+    if (u.username.toLowerCase().trim() !== cleanUsername) return false;
+
+    // 1. Plain password match (raw, trimmed, or case-insensitive)
+    if (
+      u.plainPassword === rawPassword ||
+      u.plainPassword === cleanPassword ||
+      u.password === rawPassword ||
+      u.password === cleanPassword
+    ) {
+      return true;
+    }
+    if (
+      u.plainPassword &&
+      u.plainPassword.toLowerCase() === cleanPassword.toLowerCase()
+    ) {
+      return true;
+    }
+    if (
+      u.password &&
+      u.password.toLowerCase() === cleanPassword.toLowerCase()
+    ) {
+      return true;
+    }
+
+    // 2. Password hash match (clean or raw)
+    const hashClean = hashPassword(cleanPassword);
+    const hashRaw = hashPassword(rawPassword);
+    if (u.passwordHash === hashClean || u.passwordHash === hashRaw) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // Step 1: Search in current memory state
+  let currentUsers = users && users.length > 0 ? users : getUsers();
+  let user = currentUsers.find(matchesUser);
+
+  // Step 2: If not found, force fresh fetch from Firestore (in case user was created on another machine)
+  if (!user) {
+    try {
+      const freshData = await loadData();
+      if (freshData && freshData.users) {
+        currentUsers = freshData.users;
+        user = currentUsers.find(matchesUser);
+      }
+    } catch (e) {
+      console.warn("Fresh loadData during login failed:", e);
+    }
+  }
 
   if (!user) return null; // Wrong credentials or disabled
 
-  // Step 2: Try Firebase Auth (best-effort, don't block login if it fails)
+  // Step 3: Try Firebase Auth (best-effort)
   const auth = getFirebaseAuth();
   if (auth) {
-    const email = username.toLowerCase().trim() + "@chomdoi.local";
+    const email = cleanUsername + "@chomdoi.local";
     try {
-      // Try signing in with current password
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      // If password was updated locally, sync to Firebase Auth
-      if (cred.user) {
-        // Password matches Firebase Auth — all good
-      }
+      await signInWithEmailAndPassword(auth, email, cleanPassword);
     } catch (err) {
       if (
         err.code === "auth/user-not-found" ||
         err.code === "auth/invalid-credential"
       ) {
-        // Firebase Auth doesn't have this user, or has stale password
         try {
-          await createUserWithEmailAndPassword(auth, email, password);
+          await createUserWithEmailAndPassword(auth, email, cleanPassword);
         } catch (createErr) {
-          if (createErr.code === "auth/email-already-in-use") {
-            // Firebase Auth has old password. Can't sync without admin SDK.
-            // Login still proceeds — local hash matched.
-            console.warn("Firebase Auth password out of sync for:", username);
-          }
-          // Other errors: just log and continue
+          // Ignore if email already in use
         }
       }
-      // Other Firebase Auth errors: log and continue
-      // Local hash matched, so login should succeed
     }
   }
 
-  // Step 3: Create session
+  // Step 4: Create session
   const session = {
     id: user.id,
     username: user.username,

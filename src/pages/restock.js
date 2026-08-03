@@ -34,7 +34,7 @@ function draw(container) {
   const settings = getSettings();
 
   container.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;align-items:start">
+    <div class="restock-layout">
       <div class="card">
         <div class="card-header">➕ เติมสินค้า</div>
         <div class="form-group">

@@ -70,9 +70,30 @@ const allTabs = [
 
 let activeTab = "pos";
 
-// ─── Apply Theme ───
+// ─── Apply Theme & Favicon ───
 export function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme || "dark-gold");
+}
+
+export function updateAppFavicon(logoUrl) {
+  let fav = document.getElementById("app-favicon");
+  if (fav) {
+    fav.remove();
+  }
+  fav = document.createElement("link");
+  fav.id = "app-favicon";
+  fav.rel = "icon";
+  if (logoUrl) {
+    fav.href = logoUrl;
+    if (logoUrl.startsWith("data:image/png")) fav.type = "image/png";
+    else if (logoUrl.startsWith("data:image/jpeg") || logoUrl.startsWith("data:image/jpg")) fav.type = "image/jpeg";
+    else if (logoUrl.startsWith("data:image/svg")) fav.type = "image/svg+xml";
+  } else {
+    fav.type = "image/svg+xml";
+    fav.href =
+      "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏨</text></svg>";
+  }
+  document.head.appendChild(fav);
 }
 
 // ─── Modal observer: toggle body class to prevent flicker ───
@@ -85,9 +106,10 @@ modalObserver.observe(document.body, { childList: true, subtree: true });
 async function boot() {
   await initStore();
 
-  // Apply saved theme immediately
+  // Apply saved theme & favicon immediately
   const s = getSettings();
   applyTheme(s.theme || "dark-gold");
+  updateAppFavicon(s.companyLogo);
 
   const user = getCurrentUser();
   if (!user) {
@@ -96,17 +118,18 @@ async function boot() {
     renderApp();
   }
   subscribe(() => {
+    const newSettings = getSettings();
     // ถ้ามี modal เปิดอยู่ ไม่ต้อง re-render header เพราะจะทำให้หน้ากระพริบ
     if (!document.querySelector(".modal-overlay")) {
       updateHeader();
     }
-    // Re-apply theme when settings change
-    applyTheme(getSettings().theme || "dark-gold");
+    // Re-apply theme & favicon when settings change
+    applyTheme(newSettings.theme || "dark-gold");
+    updateAppFavicon(newSettings.companyLogo);
 
     // ถ้าอยู่หน้า login → re-render เพื่อให้ logo/ชื่อ update ตาม Firestore
     const loginPage = document.querySelector(".login-page");
     if (loginPage) {
-      const newSettings = getSettings();
       const titleEl = loginPage.querySelector(".login-title");
       const logoContainer = loginPage.querySelector(".login-logo");
       if (

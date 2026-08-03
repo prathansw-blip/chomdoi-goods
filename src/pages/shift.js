@@ -7,6 +7,7 @@ import {
   startShift,
   closeShift,
   deleteShift,
+  deleteTransaction,
   subscribe,
   getSettings,
   getUsers,
@@ -52,6 +53,8 @@ let unsub = null;
 let chartInstance = null;
 let viewMode = "current";
 let selectedDate = null;
+let showChartLabels = true;
+let selectedHistoryMonth = null;
 
 // Helper: สรุปยอดแยกตามวิธีชำระเงิน
 function paymentBreakdown(txns) {
@@ -84,6 +87,7 @@ export function renderShift(container) {
   if (unsub) unsub();
   viewMode = "current";
   selectedDate = null;
+  selectedHistoryMonth = null;
   draw(container);
   unsub = subscribe(() => {
     if (!document.querySelector(".modal-overlay")) draw(container);
@@ -121,6 +125,7 @@ function draw(container) {
   document.getElementById("btn-view-history").onclick = () => {
     viewMode = "history";
     selectedDate = null;
+    selectedHistoryMonth = null;
     draw(container);
   };
 
@@ -561,6 +566,7 @@ function showBillsModal(shiftId, shiftName, currency) {
               <div style="display:flex;align-items:center;gap:0.5rem">
                 <span class="badge ${txn.paymentMethod === "cash" ? "badge-success" : txn.paymentMethod === "transfer" ? "badge-info" : "badge-warning"}" style="font-size:0.72rem">${payLabels[txn.paymentMethod || "cash"]}</span>
                 <strong style="color:var(--gold);font-size:1rem">${formatCurrency(txn.total, currency)}</strong>
+                <button class="btn btn-outline btn-del-txn-shift" data-txnid="${txn.id}" style="padding:0.15rem 0.45rem;font-size:0.75rem;color:var(--red)" title="ลบรายการขายนี้และคืนสินค้าเข้า Stock">🗑️</button>
               </div>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:0.4rem">
@@ -586,6 +592,35 @@ function showBillsModal(shiftId, shiftName, currency) {
     </div>
   `;
   document.body.appendChild(overlay);
+
+  overlay.querySelectorAll(".btn-del-txn-shift").forEach((btn) => {
+    btn.onclick = () => {
+      const txnId = btn.dataset.txnid;
+      const txn = getTransactions().find((t) => t.id === txnId);
+      if (!txn) return;
+      const itemsText = txn.items.map((i) => `${i.name} ×${i.qty}`).join(", ");
+      const delConfirm = confirm(`ต้องการลบรายการขาย "${itemsText}" (ยอด ${formatCurrency(txn.total, currency)}) และคืนสินค้าเข้า Stock หรือไม่?`);
+      if (delConfirm) {
+        deleteTransaction(txnId);
+        showToast("ลบรายการขายและคืนสินค้าเข้า Stock เรียบร้อย", "success");
+        overlay.remove();
+        showBillsModal(shiftId, shiftName, currency);
+        // Refresh background shift page if active
+        const shiftBody = document.getElementById("shift-body");
+        if (shiftBody) {
+          const settings = getSettings();
+          const curr = settings.currency || "฿";
+          const active = getActiveShift();
+          const startHour = settings.businessDayStartHour || 8;
+          const shiftDefs = settings.shiftDefinitions || [];
+          const currentDef = getCurrentShiftDef(shiftDefs);
+          const todayBiz = getBusinessDate(new Date(), startHour);
+          drawCurrent(shiftBody, settings, curr, active, currentDef, todayBiz);
+        }
+      }
+    };
+  });
+
   overlay.querySelector("#bills-close").onclick = () => overlay.remove();
   overlay.onclick = (e) => {
     if (e.target === overlay) overlay.remove();
@@ -595,6 +630,7 @@ function showBillsModal(shiftId, shiftName, currency) {
 // ═══════════════════════════════════════
 // ประวัติย้อนหลัง
 // ═══════════════════════════════════════
+
 function drawHistory(el, settings, currency) {
   const transactions = getTransactions();
   const shifts = getShifts();
@@ -616,6 +652,18 @@ function drawHistory(el, settings, currency) {
   });
 
   const sortedDates = Object.keys(dateMap).sort().reverse();
+
+  // Get list of unique months having transactions or shifts
+  const uniqueMonths = [...new Set(sortedDates.map((d) => d.substring(0, 7)))];
+  if (uniqueMonths.length === 0) {
+    const now = new Date();
+    uniqueMonths.push(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  }
+
+  // Set default selected month if null
+  if (!selectedHistoryMonth) {
+    selectedHistoryMonth = uniqueMonths[0];
+  }
 
   if (!selectedDate && sortedDates.length > 0) {
     // Don't auto-select, show date list
@@ -651,7 +699,6 @@ function drawHistory(el, settings, currency) {
       </div>
       <!-- Detail -->
       <div id="history-detail">
-        ${selectedDate ? "" : '<div class="card"><div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-text">เลือกวันที่ด้านซ้ายเพื่อดูรายละเอียด</div></div></div>'}
       </div>
     </div>
   `;
@@ -680,7 +727,7 @@ function drawHistory(el, settings, currency) {
     };
   });
 
-  // Render detail if selected
+  // Render detail if selected, otherwise render month chart
   if (selectedDate) {
     drawDayDetail(
       document.getElementById("history-detail"),
@@ -688,7 +735,206 @@ function drawHistory(el, settings, currency) {
       settings,
       currency,
     );
+  } else {
+    drawMonthSummary(
+      document.getElementById("history-detail"),
+      selectedHistoryMonth,
+      settings,
+      currency,
+      sortedDates,
+      transactions,
+      startHour,
+      uniqueMonths
+    );
   }
+}
+
+function drawMonthSummary(el, activeMonth, settings, currency, sortedDates, transactions, startHour, uniqueMonths) {
+  const [year, month] = activeMonth.split("-").map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  const monthTxns = transactions.filter((t) => {
+    const bd = t.businessDate || getBusinessDate(t.timestamp, startHour);
+    return bd.startsWith(activeMonth);
+  });
+
+  const monthPb = paymentBreakdown(monthTxns);
+  const monthTotal = monthPb.total;
+
+  const thaiMonthNames = [
+    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+  ];
+  const monthLabel = `${thaiMonthNames[month - 1]} ${year + 543}`;
+
+  // Calculate daily sales for chart
+  const dailySales = Array(daysInMonth).fill(0);
+  const dailyBills = Array(daysInMonth).fill(0);
+  const uniqueSaleDays = new Set();
+
+  monthTxns.forEach((t) => {
+    const bd = t.businessDate || getBusinessDate(t.timestamp, startHour);
+    const dayNum = parseInt(bd.split("-")[2], 10);
+    if (dayNum >= 1 && dayNum <= daysInMonth) {
+      dailySales[dayNum - 1] += t.total;
+      dailyBills[dayNum - 1] += 1;
+      if (t.total > 0) {
+        uniqueSaleDays.add(bd);
+      }
+    }
+  });
+
+  const numSaleDays = uniqueSaleDays.size || 1;
+  const averagePerDay = monthTotal / numSaleDays;
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:1.25rem">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📊 สรุปยอดขายประจำเดือน</span>
+        <select id="select-history-month" style="padding:0.3rem 0.75rem;font-size:0.9rem;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);cursor:pointer;font-family:'Inter',sans-serif;outline:none">
+          ${uniqueMonths.map((mStr) => {
+            const [y, m] = mStr.split("-").map(Number);
+            const label = `${thaiMonthNames[m - 1]} ${y + 543}`;
+            return `<option value="${mStr}" ${activeMonth === mStr ? "selected" : ""}>${label}</option>`;
+          }).join("")}
+        </select>
+      </div>
+      <div class="stats-grid" style="margin-bottom:0">
+        <div class="stat-card">
+          <div class="stat-label">ยอดขายรวมทั้งเดือน</div>
+          <div class="stat-value" style="color:var(--gold)">${formatCurrency(monthTotal, currency)}</div>
+          ${paymentBadges(monthPb, currency)}
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">จำนวน Bills ทั้งหมด</div>
+          <div class="stat-value">${monthTxns.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">เฉลี่ยต่อวัน (ที่มีการขาย)</div>
+          <div class="stat-value" style="color:var(--emerald)">${formatCurrency(averagePerDay, currency)}</div>
+        </div>
+      </div>
+    </div>
+
+    ${
+      monthTxns.length > 0
+        ? `
+      <div class="chart-container">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📈 ยอดขายรายวัน (เดือน ${monthLabel})</span>
+          <button class="btn btn-outline" id="btn-toggle-labels" style="padding:0.25rem 0.6rem;font-size:0.8rem;height:auto">
+            ${showChartLabels ? "🙈 ซ่อนตัวเลข" : "👁️ แสดงตัวเลข"}
+          </button>
+        </div>
+        <canvas id="history-month-chart" height="100"></canvas>
+      </div>
+    `
+        : '<div class="card"><div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-text">ยังไม่มีข้อมูลยอดขายในเดือนนี้</div></div></div>'
+    }
+  `;
+
+  if (monthTxns.length > 0) {
+    buildMonthChart(dailySales, daysInMonth, monthLabel);
+
+    const toggleBtn = document.getElementById("btn-toggle-labels");
+    if (toggleBtn) {
+      toggleBtn.onclick = () => {
+        showChartLabels = !showChartLabels;
+        toggleBtn.textContent = showChartLabels ? "🙈 ซ่อนตัวเลข" : "👁️ แสดงตัวเลข";
+        if (chartInstance) {
+          chartInstance.update();
+        }
+      };
+    }
+  }
+
+  // Hook change event of dropdown
+  const monthSelect = document.getElementById("select-history-month");
+  if (monthSelect) {
+    monthSelect.onchange = (e) => {
+      selectedHistoryMonth = e.target.value;
+      draw(el.closest(".page-content"));
+    };
+  }
+}
+
+function buildMonthChart(dailySales, daysInMonth, monthLabel) {
+  if (chartInstance) {
+    chartInstance.destroy();
+    chartInstance = null;
+  }
+  const canvas = document.getElementById("history-month-chart");
+  if (!canvas) return;
+
+  const labels = Array.from({ length: daysInMonth }, (_, i) => `${i + 1}`);
+
+  chartInstance = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "ยอดขาย (฿)",
+          data: dailySales,
+          backgroundColor: "rgba(245,158,11,0.6)",
+          borderColor: "#f59e0b",
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (context) => {
+              const day = context[0].label;
+              return `วันที่ ${day} ${monthLabel}`;
+            },
+            label: (ctx) => `ยอดขาย: ฿${ctx.raw.toLocaleString()}`
+          },
+        },
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grace: "15%",
+          grid: { color: "rgba(42,53,80,0.5)" },
+          ticks: { color: "#94a3b8" },
+        },
+        x: { grid: { display: false }, ticks: { color: "#94a3b8" } },
+      },
+    },
+    plugins: [
+      {
+        id: "barLabels",
+        afterDatasetsDraw(chart) {
+          if (!showChartLabels) return;
+          const { ctx, data } = chart;
+          ctx.save();
+          ctx.font = 'bold 9px "Inter", sans-serif';
+          ctx.fillStyle = "#fcd34d";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+
+          chart.getDatasetMeta(0).data.forEach((bar, index) => {
+            const value = data.datasets[0].data[index];
+            if (value > 0) {
+              const { x, y } = bar;
+              ctx.save();
+              ctx.translate(x, y - 6);
+              ctx.rotate(-Math.PI / 4);
+              ctx.fillText(`฿${value.toLocaleString()}`, 0, 0);
+              ctx.restore();
+            }
+          });
+          ctx.restore();
+        }
+      }
+    ]
+  });
 }
 
 function drawDayDetail(el, date, settings, currency) {

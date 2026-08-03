@@ -7,6 +7,7 @@ import {
   updateHotelSupply,
   deleteHotelSupply,
   addSupplyCheck,
+  deleteSupplyCheck,
   addSupplyRestock,
   getUsers,
   subscribe,
@@ -72,7 +73,7 @@ function draw(container) {
 }
 
 // ─── DAILY CHECK ───
-function drawCheck(el, supplies, checks, today) {
+function drawCheck(el, supplies, checks, today, isEditing = false) {
   if (supplies.length === 0) {
     el.innerHTML = `<div class="card"><div class="empty-state"><div class="empty-state-icon">🏨</div><div class="empty-state-text">ยังไม่มีรายการของใช้<br>กด "จัดการรายการ" เพื่อเพิ่มรายการ</div></div></div>`;
     return;
@@ -95,6 +96,8 @@ function drawCheck(el, supplies, checks, today) {
   const isCheckTime = currentHour >= 16 && currentHour < 17;
   const isFirstTime = checks.length === 0;
 
+  const isInteractive = !todayCheck || isEditing;
+
   el.innerHTML = `
     <div class="card" style="margin-bottom:1.25rem">
       <div class="card-header">
@@ -113,9 +116,21 @@ function drawCheck(el, supplies, checks, today) {
       ${
         todayCheck
           ? `
-        <div style="padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:1rem;background:rgba(16,185,129,0.1)">
-          <strong>✅ เช็คแล้ววันนี้</strong>
-          <span style="font-size:0.85rem;color:var(--text-muted);margin-left:0.5rem">โดย ${todayCheck.checkedBy?.displayName || "-"} เวลา ${new Date(todayCheck.timestamp).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</span>
+        <div style="padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:1rem;background:${isEditing ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.1)"};display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem">
+          <div>
+            <strong>${isEditing ? "✏️ กำลังแก้ไขยอดเช็ควันนี้" : "✅ เช็คแล้ววันนี้"}</strong>
+            <span style="font-size:0.85rem;color:var(--text-muted);margin-left:0.5rem">โดย ${todayCheck.checkedBy?.displayName || "-"} เวลา ${new Date(todayCheck.timestamp).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</span>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            ${
+              !isEditing
+                ? `
+              <button class="btn btn-outline" id="btn-edit-check" style="font-size:0.8rem;padding:0.35rem 0.7rem">✏️ แก้ไขจำนวน</button>
+              <button class="btn btn-danger" id="btn-reset-check" style="font-size:0.8rem;padding:0.35rem 0.7rem" title="ล้างค่านับใหม่ทั้งหมด">🔄 ล้างค่านับใหม่ (Reset)</button>
+            `
+                : `<button class="btn btn-outline" id="btn-cancel-edit-check" style="font-size:0.8rem;padding:0.35rem 0.7rem">ยกเลิกการแก้ไข</button>`
+            }
+          </div>
         </div>
       `
           : ""
@@ -135,12 +150,10 @@ function drawCheck(el, supplies, checks, today) {
             ${supplies
               .map((s) => {
                 const prevCount = prevCheck
-                  ? (prevCheck.items.find((i) => i.supplyId === s.id)?.count ??
-                    "—")
+                  ? (prevCheck.items.find((i) => i.supplyId === s.id)?.count ?? "—")
                   : "—";
                 const todayCount = todayCheck
-                  ? (todayCheck.items.find((i) => i.supplyId === s.id)?.count ??
-                    "")
+                  ? (todayCheck.items.find((i) => i.supplyId === s.id)?.count ?? "")
                   : "";
                 const restockQty = restocksSincePrev
                   .filter((r) => r.supplyId === s.id)
@@ -150,19 +163,18 @@ function drawCheck(el, supplies, checks, today) {
                 if (prevCount !== "—" && todayCount !== "") {
                   usage = prevCount + restockQty - todayCount;
                 }
-                const isLow =
-                  todayCheck && todayCount !== "" && +todayCount <= threshold;
-                return `<tr${isLow ? ' style="background:rgba(239,68,68,0.08)"' : ""}>
-                <td><span style="display:inline-flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">${s.icon}</span>${s.name}</span>${isLow ? ' <span style="color:var(--red);font-size:0.75rem">⚠️ ต่ำ</span>' : ""}</td>
+                const isLow = todayCheck && todayCount !== "" && +todayCount <= threshold;
+                return `<tr${isLow && !isInteractive ? ' style="background:rgba(239,68,68,0.08)"' : ""}>
+                <td><span style="display:inline-flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">${s.icon}</span>${s.name}</span>${isLow && !isInteractive ? ' <span style="color:var(--red);font-size:0.75rem">⚠️ ต่ำ</span>' : ""}</td>
                 <td>${prevCount !== "—" ? prevCount + " " + s.unit : '<span style="color:var(--text-muted)">ยังไม่เคยเช็ค</span>'}</td>
                 <td>${restockQty > 0 ? `<span style="color:var(--green);font-weight:600">+${restockQty} ${s.unit}</span>` : "—"}</td>
                 <td>${
-                  todayCheck
-                    ? `<strong style="${isLow ? "color:var(--red)" : ""}">${todayCount}</strong> ${s.unit}${isLow ? ` <span style="font-size:0.7rem;color:var(--text-muted)">(เตือน≤${threshold})</span>` : ""}`
-                    : `<input type="number" min="0" class="form-input supply-count-input" data-sid="${s.id}" style="width:80px;padding:0.3rem;text-align:center" placeholder="0">`
+                  isInteractive
+                    ? `<input type="number" min="0" class="form-input supply-count-input" data-sid="${s.id}" style="width:90px;padding:0.3rem;text-align:center" value="${todayCount !== "" ? todayCount : ""}" placeholder="0">`
+                    : `<strong style="${isLow ? "color:var(--red)" : ""}">${todayCount}</strong> ${s.unit}${isLow ? ` <span style="font-size:0.7rem;color:var(--text-muted)">(เตือน≤${threshold})</span>` : ""}`
                 }</td>
                 <td>${
-                  usage !== "—" && usage >= 0
+                  !isInteractive && usage !== "—" && usage >= 0
                     ? `<span style="color:${usage > 0 ? "var(--orange)" : "var(--green)"};font-weight:700">${usage > 0 ? "-" + usage : "0"} ${s.unit}</span>`
                     : "—"
                 }</td>
@@ -173,22 +185,22 @@ function drawCheck(el, supplies, checks, today) {
         </table>
       </div>
       ${
-        !todayCheck
+        isInteractive
           ? `
-        <div style="margin-top:1rem;display:flex;gap:0.75rem;align-items:center">
-          <div class="form-group" style="margin:0;flex:1;max-width:250px">
+        <div style="margin-top:1rem;display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+          <div class="form-group" style="margin:0;flex:1;min-width:200px;max-width:250px">
             <select class="form-select" id="check-user-select">
               <option value="">— เลือกผู้เช็ค —</option>
               ${getUsers()
                 .filter((u) => u.active !== false && u.role !== "admin")
                 .map((u) => {
-                  const cur = getCurrentUser();
-                  return `<option value="${u.id}" ${u.id === cur?.id ? "selected" : ""}>${u.displayName}</option>`;
+                  const selectedUser = todayCheck?.checkedBy?.id || getCurrentUser()?.id;
+                  return `<option value="${u.id}" ${u.id === selectedUser ? "selected" : ""}>${u.displayName}</option>`;
                 })
                 .join("")}
             </select>
           </div>
-          <button class="btn btn-primary" id="btn-save-check">💾 บันทึกการเช็ค</button>
+          <button class="btn btn-primary" id="btn-save-check">${todayCheck ? "💾 บันทึกการแก้ไข" : "💾 บันทึกการเช็ค"}</button>
         </div>
       `
           : ""
@@ -218,6 +230,35 @@ function drawCheck(el, supplies, checks, today) {
         : ""
     }
   `;
+
+  // Bind Reset button
+  const resetBtn = document.getElementById("btn-reset-check");
+  if (resetBtn) {
+    resetBtn.onclick = () => {
+      const confirmReset = confirm("ต้องการล้างค่านับของวันนี้ทั้งหมด เพื่อเริ่มกรอกใหม่ใช่หรือไม่?");
+      if (confirmReset) {
+        deleteSupplyCheck(today);
+        showToast("ล้างค่านับของวันนี้เรียบร้อยแล้ว คุณสามารถกรอกตัวเลขใหม่ได้ทันที", "success");
+        drawCheck(el, supplies, getSupplyChecks(), today, false);
+      }
+    };
+  }
+
+  // Bind Edit button
+  const editBtn = document.getElementById("btn-edit-check");
+  if (editBtn) {
+    editBtn.onclick = () => {
+      drawCheck(el, supplies, getSupplyChecks(), today, true);
+    };
+  }
+
+  // Bind Cancel Edit button
+  const cancelEditBtn = document.getElementById("btn-cancel-edit-check");
+  if (cancelEditBtn) {
+    cancelEditBtn.onclick = () => {
+      drawCheck(el, supplies, getSupplyChecks(), today, false);
+    };
+  }
 
   // Save check event
   const saveBtn = document.getElementById("btn-save-check");
@@ -289,7 +330,8 @@ function drawCheck(el, supplies, checks, today) {
         items: notifyItems,
       });
 
-      showToast("บันทึกการเช็คสำเร็จ ✅", "success");
+      showToast(todayCheck ? "บันทึกการแก้ไขสำเร็จ ✅" : "บันทึกการเช็คสำเร็จ ✅", "success");
+      drawCheck(el, supplies, getSupplyChecks(), today, false);
     };
   }
 }
