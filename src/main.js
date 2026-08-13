@@ -73,7 +73,17 @@ let activeTab = "pos";
 
 // ─── Apply Theme & Favicon ───
 export function applyTheme(theme) {
-  document.documentElement.setAttribute("data-theme", theme || "dark-gold");
+  let activeTheme = theme || "graphite-gold";
+  if (activeTheme === "dark-gold") activeTheme = "graphite-gold";
+  if (activeTheme === "dark-blue") activeTheme = "slate-blue";
+  if (
+    activeTheme !== "graphite-gold" &&
+    activeTheme !== "slate-blue" &&
+    activeTheme !== "warm-stone"
+  ) {
+    activeTheme = "graphite-gold";
+  }
+  document.documentElement.setAttribute("data-theme", activeTheme);
 }
 
 export function updateAppFavicon(logoUrl) {

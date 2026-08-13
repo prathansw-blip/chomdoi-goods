@@ -164,7 +164,7 @@ export const defaultSettings = {
   companyLogo: null,
   currency: "฿",
   lowStockThreshold: 5,
-  theme: "dark-gold",
+  theme: "graphite-gold",
   // โครงสร้างกะ — 1 วันจบที่ 08:00 (businessDayStartHour)
   businessDayStartHour: 8,
   shiftDefinitions: [

@@ -28,7 +28,17 @@ import {
 } from "firebase/auth";
 
 function applyTheme(theme) {
-  document.documentElement.setAttribute("data-theme", theme || "dark-gold");
+  let activeTheme = theme || "graphite-gold";
+  if (activeTheme === "dark-gold") activeTheme = "graphite-gold";
+  if (activeTheme === "dark-blue") activeTheme = "slate-blue";
+  if (
+    activeTheme !== "graphite-gold" &&
+    activeTheme !== "slate-blue" &&
+    activeTheme !== "warm-stone"
+  ) {
+    activeTheme = "graphite-gold";
+  }
+  document.documentElement.setAttribute("data-theme", activeTheme);
 }
 
 let unsub = null;
@@ -376,44 +386,47 @@ function draw(container) {
     <!-- Theme Picker -->
     <div class="settings-section">
       <div class="settings-section-title">🎨 ธีม / สีระบบ</div>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">เลือกโทนสีของระบบที่เหมาะกับการใช้งานของคุณ</p>
       <div class="theme-picker">
         ${[
           {
-            id: "dark-gold",
-            label: "🌑 Dark Gold",
-            colors: ["#0a0e1a", "#1a2236", "#f59e0b"],
+            id: "graphite-gold",
+            title: "Graphite Gold",
+            subtitle: "Luxury Hotel Admin (Default)",
+            colors: ["#0D1117", "#161D2B", "#D6A928"],
           },
           {
-            id: "dark-blue",
-            label: "🌊 Dark Blue",
-            colors: ["#060d1f", "#112240", "#3b82f6"],
+            id: "slate-blue",
+            title: "Slate Blue",
+            subtitle: "Modern SaaS Dashboard",
+            colors: ["#0F172A", "#172033", "#3B82F6"],
           },
           {
-            id: "dark-green",
-            label: "🌿 Dark Green",
-            colors: ["#061210", "#122e29", "#10b981"],
-          },
-          {
-            id: "dark-purple",
-            label: "🌸 Dark Purple",
-            colors: ["#0c0a1f", "#1e1545", "#8b5cf6"],
-          },
-          {
-            id: "light",
-            label: "☀️ Light",
-            colors: ["#f8fafc", "#ffffff", "#f59e0b"],
+            id: "warm-stone",
+            title: "Warm Stone",
+            subtitle: "Warm Minimal Hotel",
+            colors: ["#181714", "#23211D", "#C9975B"],
           },
         ]
-          .map(
-            (t) => `
-          <button class="theme-btn ${s.theme === t.id ? "active" : ""}" data-theme-id="${t.id}">
+          .map((t) => {
+            const currentTheme = s.theme || "graphite-gold";
+            const isMatch =
+              currentTheme === t.id ||
+              (t.id === "graphite-gold" &&
+                (currentTheme === "dark-gold" || !currentTheme)) ||
+              (t.id === "slate-blue" && currentTheme === "dark-blue");
+            return `
+          <button class="theme-btn ${isMatch ? "active" : ""}" data-theme-id="${t.id}">
             <div class="theme-swatch">
               ${t.colors.map((c) => `<span style="background:${c}"></span>`).join("")}
             </div>
-            ${t.label}
+            <div class="theme-info">
+              <span class="theme-title">${t.title}</span>
+              <span class="theme-subtitle">${t.subtitle}</span>
+            </div>
           </button>
-        `,
-          )
+        `;
+          })
           .join("")}
       </div>
     </div>
@@ -575,9 +588,15 @@ function draw(container) {
   container.querySelectorAll(".theme-btn").forEach((btn) => {
     btn.onclick = () => {
       const themeId = btn.dataset.themeId;
+      const themeTitle =
+        btn.querySelector(".theme-title")?.textContent || themeId;
       updateSettings({ theme: themeId });
       applyTheme(themeId);
-      showToast(`เปลี่ยน theme เป็น "${btn.textContent.trim()}"`, "success");
+      container
+        .querySelectorAll(".theme-btn")
+        .forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      showToast(`เปลี่ยนธีมเป็น "${themeTitle}" แล้ว`, "success");
     };
   });
 

@@ -113,7 +113,7 @@ export async function loadData() {
       local.settings.shiftDefinitions = defaultSettings.shiftDefinitions;
     if (!local.settings.categories)
       local.settings.categories = defaultSettings.categories;
-    if (!local.settings.theme) local.settings.theme = "dark-gold";
+    if (!local.settings.theme) local.settings.theme = "graphite-gold";
     if (!local.users || local.users.length === 0)
       local.users = createDefaultUsers();
     saveLocal(local);
