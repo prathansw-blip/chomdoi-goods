@@ -97,8 +97,8 @@ function draw(container) {
               <div class="product-card ${p.stock <= 0 ? "out-of-stock" : ""}" data-id="${p.id}">
                 ${
                   p.photo
-                    ? `<img src="${p.photo}" alt="${escapeHtml(p.name)}" style="width:56px;height:56px;border-radius:8px;object-fit:cover;margin-bottom:0.4rem">`
-                    : `<div class="product-emoji">${getProductIcon(p, settings)}</div>`
+                    ? `<div class="product-img-wrap"><img src="${p.photo}" alt="${escapeHtml(p.name)}"></div>`
+                    : `<div class="product-emoji-wrap">${getProductIcon(p, settings)}</div>`
                 }
                 <div class="product-name">${escapeHtml(p.name)}</div>
                 <div class="product-price">${formatCurrency(p.price, currency)}</div>
@@ -122,7 +122,7 @@ function draw(container) {
                   (c, i) => `
                 <div class="cart-item">
                   <div class="cart-item-info">
-                    <span>${c.image}</span>
+                    <span style="font-size:1.1rem">${c.image}</span>
                     <span class="cart-item-name">${escapeHtml(c.name)}</span>
                   </div>
                   <div class="cart-qty-controls">
@@ -131,14 +131,14 @@ function draw(container) {
                     <button class="cart-qty-btn" data-action="inc" data-idx="${i}">+</button>
                   </div>
                   <span class="cart-item-subtotal">${formatCurrency(c.subtotal, currency)}</span>
-                  <button class="cart-qty-btn" data-action="remove" data-idx="${i}" style="color:var(--red);border-color:var(--red);margin-left:0.3rem;">✕</button>
+                  <button class="cart-qty-btn cart-qty-del" data-action="remove" data-idx="${i}" title="ลบรายการนี้">✕</button>
                 </div>
               `,
                 )
                 .join("")}
             </div>
             <div class="cart-total">
-              <span>รวมทั้งหมด</span>
+              <span style="color:var(--text-secondary)">รวมทั้งหมด</span>
               <span class="cart-total-amount">${formatCurrency(cartTotal, currency)}</span>
             </div>
             <button class="btn btn-primary btn-lg btn-block" id="btn-confirm-sale" style="margin-top:1rem;">✅ ยืนยันการขาย</button>

@@ -71,9 +71,9 @@ const defaultCategories = [
 
 export function getCategoryLabels(settings) {
   const cats = settings?.categories || defaultCategories;
-  const labels = { all: "🏷️ ทั้งหมด" };
+  const labels = { all: "ทั้งหมด" };
   cats.forEach((c) => {
-    labels[c.id] = `${c.icon} ${c.name}`;
+    labels[c.id] = c.name;
   });
   return labels;
 }
@@ -92,10 +92,10 @@ export function getProductIcon(product, settings) {
 
 // Keep backward compat (static fallback)
 export const categoryLabels = {
-  all: "🏷️ ทั้งหมด",
-  water: "💧 น้ำดื่ม",
-  snack: "🍪 ขนม",
-  beer: "🍺 เบียร์",
+  all: "ทั้งหมด",
+  water: "น้ำดื่ม",
+  snack: "ขนม",
+  beer: "เบียร์",
 };
 
 export function getStockStatus(product) {

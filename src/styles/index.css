@@ -3,7 +3,7 @@
 /* ═══════════════════════════════════════════════════════════
    THEME DESIGN SYSTEM — CHOMDOI HOUSE
    3 Professional Minimal Themes:
-   1. Graphite Gold (Default)
+   1. Graphite Gold (Neutral Graphite / Soft Gold — Default)
    2. Slate Blue
    3. Warm Stone
 ═══════════════════════════════════════════════════════════ */
@@ -12,42 +12,44 @@
 :root,
 [data-theme="graphite-gold"],
 [data-theme="dark-gold"] {
-  /* Surfaces & Backgrounds */
-  --bg-primary: #0D1117;
-  --bg-secondary: #111827;
-  --bg-card: #161D2B;
-  --bg-card-hover: #1C2535;
-  --bg-elevated: #1C2535;
-  --bg-input: #121927;
+  /* Neutral Surfaces & Backgrounds */
+  --bg-primary: #0C1016;       /* Page Background */
+  --bg-secondary: #101620;     /* Header / Navbar */
+  --bg-surface: #131A23;       /* Surface / Table Header */
+  --bg-card: #151C26;          /* Card / Panel */
+  --bg-card-hover: #18212C;    /* Card Hover */
+  --bg-elevated: #1A222D;      /* Elevated Surface / Modal / Dropdown */
+  --bg-input: #121822;         /* Input */
 
-  /* Borders */
-  --border: #293244;
-  --border-subtle: #20293A;
-  --border-focus: #D6A928;
+  /* Reduced Contrast Borders */
+  --border: #252E3A;           /* Normal Border */
+  --border-subtle: #202833;    /* Subtle Border / Divider */
+  --border-hover: #303A48;     /* Hover Border */
+  --border-focus: #D6A928;     /* Focus Border */
 
-  /* Typography */
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
+  /* Neutral Typography */
+  --text-primary: #F1F3F5;
+  --text-secondary: #A0A8B5;
+  --text-muted: #6F7886;
 
-  /* Primary Accent */
+  /* Primary Accent - Brand Gold */
   --accent: #D6A928;
-  --accent-hover: #E5BA3B;
-  --accent-soft: rgba(214, 169, 40, 0.12);
-  --accent-contrast: #0D1117;
+  --accent-hover: #E2B63A;
+  --accent-soft: rgba(214, 169, 40, 0.08);
+  --accent-contrast: #0C1016;
   --gold: #D6A928;
-  --gold-light: #E5BA3B;
+  --gold-light: #E2B63A;
   --gold-dark: #B88E1F;
 
-  /* Semantic Feedback */
+  /* Semantic Feedback (Subtle & Restrained) */
   --success: #22C55E;
-  --success-soft: rgba(34, 197, 94, 0.12);
+  --success-soft: rgba(34, 197, 94, 0.10);
   --warning: #F59E0B;
-  --warning-soft: rgba(245, 158, 11, 0.12);
+  --warning-soft: rgba(245, 158, 11, 0.10);
   --danger: #EF4444;
-  --danger-soft: rgba(239, 68, 68, 0.12);
+  --danger-soft: rgba(239, 68, 68, 0.08);
   --info: #38BDF8;
-  --info-soft: rgba(56, 189, 248, 0.12);
+  --info-soft: rgba(56, 189, 248, 0.10);
 
   --emerald: #22C55E;
   --red: #EF4444;
@@ -55,12 +57,13 @@
   --orange: #F59E0B;
   --purple: #A855F7;
 
-  --shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.3);
   --radius: 12px;
   --radius-sm: 8px;
-  --radius-lg: 16px;
-  --transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --radius-badge: 6px;
+  --radius-pill: 9999px;
+  --transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── THEME 2: Slate Blue (Modern SaaS) ── */
@@ -69,6 +72,7 @@
   /* Surfaces & Backgrounds */
   --bg-primary: #0F172A;
   --bg-secondary: #111C31;
+  --bg-surface: #141E34;
   --bg-card: #172033;
   --bg-card-hover: #1E293B;
   --bg-elevated: #1E293B;
@@ -77,6 +81,7 @@
   /* Borders */
   --border: #2A3850;
   --border-subtle: #223047;
+  --border-hover: #334460;
   --border-focus: #3B82F6;
 
   /* Typography */
@@ -87,7 +92,7 @@
   /* Primary Accent */
   --accent: #3B82F6;
   --accent-hover: #60A5FA;
-  --accent-soft: rgba(59, 130, 246, 0.12);
+  --accent-soft: rgba(59, 130, 246, 0.10);
   --accent-contrast: #FFFFFF;
   --gold: #3B82F6;
   --gold-light: #60A5FA;
@@ -95,19 +100,27 @@
 
   /* Semantic Feedback */
   --success: #22C55E;
-  --success-soft: rgba(34, 197, 94, 0.12);
+  --success-soft: rgba(34, 197, 94, 0.10);
   --warning: #F59E0B;
-  --warning-soft: rgba(245, 158, 11, 0.12);
+  --warning-soft: rgba(245, 158, 11, 0.10);
   --danger: #EF4444;
-  --danger-soft: rgba(239, 68, 68, 0.12);
+  --danger-soft: rgba(239, 68, 68, 0.08);
   --info: #38BDF8;
-  --info-soft: rgba(56, 189, 248, 0.12);
+  --info-soft: rgba(56, 189, 248, 0.10);
 
   --emerald: #22C55E;
   --red: #EF4444;
   --blue: #3B82F6;
   --orange: #F59E0B;
   --purple: #8B5CF6;
+
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-badge: 6px;
+  --radius-pill: 9999px;
+  --transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── THEME 3: Warm Stone (Warm Minimal Hotel) ── */
@@ -118,6 +131,7 @@
   /* Surfaces & Backgrounds */
   --bg-primary: #181714;
   --bg-secondary: #1D1C18;
+  --bg-surface: #201E1A;
   --bg-card: #23211D;
   --bg-card-hover: #2A2823;
   --bg-elevated: #2A2823;
@@ -126,6 +140,7 @@
   /* Borders */
   --border: #38352F;
   --border-subtle: #302D28;
+  --border-hover: #444038;
   --border-focus: #C9975B;
 
   /* Typography */
@@ -136,7 +151,7 @@
   /* Primary Accent */
   --accent: #C9975B;
   --accent-hover: #D8AA70;
-  --accent-soft: rgba(201, 151, 91, 0.12);
+  --accent-soft: rgba(201, 151, 91, 0.10);
   --accent-contrast: #181714;
   --gold: #C9975B;
   --gold-light: #D8AA70;
@@ -144,19 +159,27 @@
 
   /* Semantic Feedback */
   --success: #4CAF72;
-  --success-soft: rgba(76, 175, 114, 0.12);
+  --success-soft: rgba(76, 175, 114, 0.10);
   --warning: #D9A441;
-  --warning-soft: rgba(217, 164, 65, 0.12);
+  --warning-soft: rgba(217, 164, 65, 0.10);
   --danger: #E35D5D;
-  --danger-soft: rgba(227, 93, 93, 0.12);
+  --danger-soft: rgba(227, 93, 93, 0.08);
   --info: #69A8C9;
-  --info-soft: rgba(105, 168, 201, 0.12);
+  --info-soft: rgba(105, 168, 201, 0.10);
 
   --emerald: #4CAF72;
   --red: #E35D5D;
   --blue: #69A8C9;
   --orange: #D9A441;
   --purple: #9D7BA8;
+
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-badge: 6px;
+  --radius-pill: 9999px;
+  --transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 *,
@@ -199,7 +222,7 @@ h5 {
 /* ═══ HEADER ═══ */
 .app-header {
   background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-subtle);
   padding: 0.75rem 1.5rem;
   display: flex;
   align-items: center;
@@ -249,7 +272,7 @@ h5 {
   background: var(--bg-input);
   padding: 0.35rem 0.85rem;
   border-radius: 20px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   font-size: 0.82rem;
   color: var(--text-secondary);
 }
@@ -265,7 +288,7 @@ h5 {
 .tab-nav {
   display: flex;
   background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-subtle);
   overflow-x: auto;
   scrollbar-width: none;
   isolation: isolate;
@@ -282,15 +305,15 @@ h5 {
   justify-content: center;
   gap: 0.35rem;
   padding: 0.65rem 0.5rem;
-  background: none;
+  background: transparent;
   border: none;
-  color: #7C8494;
+  color: #8B94A2;
   font-family: "Inter", sans-serif;
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
-  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
-  border-bottom: 3px solid transparent;
+  transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+  border-bottom: 2px solid transparent;
   white-space: nowrap;
 }
 .tab-btn .tab-icon {
@@ -299,30 +322,38 @@ h5 {
   justify-content: center;
   width: 22px;
   height: 22px;
-  color: inherit;
+  color: #7D8795;
 }
 .tab-btn .tab-icon svg,
 .lucide-nav-icon {
-  width: 21px;
-  height: 21px;
+  width: 20px;
+  height: 20px;
   stroke: currentColor;
-  stroke-width: 1.9;
+  stroke-width: 1.85;
   fill: none;
   display: block;
-  transition: stroke 0.18s ease, transform 0.18s ease;
+  transition: stroke 0.16s ease;
 }
 .tab-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-elevated);
+  color: #D5DAE1;
+  background: rgba(255, 255, 255, 0.02);
+}
+.tab-btn:hover .tab-icon,
+.tab-btn:hover .tab-icon svg,
+.tab-btn:hover .lucide-nav-icon {
+  color: #D5DAE1;
+  stroke: #D5DAE1;
 }
 .tab-btn.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
-  background: var(--accent-soft);
+  background: rgba(214, 169, 40, 0.04);
   font-weight: 600;
 }
+.tab-btn.active .tab-icon,
 .tab-btn.active .tab-icon svg,
 .tab-btn.active .lucide-nav-icon {
+  color: var(--accent);
   stroke: var(--accent);
 }
 
@@ -335,7 +366,8 @@ h5 {
   width: 100%;
 }
 .page-title {
-  font-size: 1.4rem;
+  font-size: 1.35rem;
+  font-weight: 700;
   margin-bottom: 1rem;
   display: flex;
   align-items: center;
@@ -352,11 +384,11 @@ h5 {
   transition: var(--transition);
 }
 .card:hover {
-  border-color: var(--border-focus);
+  border-color: var(--border-hover);
 }
 .card-header {
   font-family: "Outfit", sans-serif;
-  font-size: 1.02rem;
+  font-size: 1rem;
   font-weight: 600;
   margin-bottom: 1rem;
   display: flex;
@@ -372,184 +404,105 @@ h5 {
   gap: 1rem;
 }
 .product-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: #151C26;
+  border: 1px solid #242D39;
+  border-radius: 12px;
   padding: 1rem;
   text-align: center;
   cursor: pointer;
   transition: var(--transition);
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 .product-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-focus);
-  box-shadow: var(--shadow);
+  background: #18212C;
+  border-color: #303A48;
+  transform: translateY(-1px);
 }
-.product-card.out-of-stock {
-  opacity: 0.5;
-  pointer-events: none;
+.product-img-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  background: #F1F3F5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+  padding: 4px;
 }
-.product-emoji {
+.product-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.product-emoji-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 2rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.6rem;
 }
 .product-name {
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.88rem;
   margin-bottom: 0.25rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--text-primary);
+  color: #E6E9EE;
+  width: 100%;
 }
 .product-price {
   color: var(--accent);
-  font-weight: 700;
-  font-size: 1.05rem;
-  margin-bottom: 0.5rem;
+  font-weight: 600;
+  font-size: 1.02rem;
+  margin-bottom: 0.45rem;
 }
 .product-stock {
-  font-size: 0.78rem;
-  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  padding: 0.18rem 0.5rem;
   border-radius: 6px;
   display: inline-block;
   font-weight: 500;
+  line-height: 1.2;
 }
 .stock-ok {
-  background: var(--success-soft);
-  color: var(--success);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  background: rgba(34, 197, 94, 0.10);
+  color: #4ADE80;
+  border: 1px solid rgba(34, 197, 94, 0.15);
 }
 .stock-low {
-  background: var(--warning-soft);
-  color: var(--warning);
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  animation: pulse 2s infinite;
+  background: rgba(245, 158, 11, 0.10);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.15);
 }
 .stock-out {
-  background: var(--danger-soft);
-  color: var(--danger);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.08);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.12);
 }
-
-/* ═══ CART ═══ */
-.cart {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.25rem;
-  margin-top: 1.25rem;
+.product-card.out-of-stock {
+  opacity: 0.7;
 }
-.cart-items {
-  max-height: 250px;
-  overflow-y: auto;
+.product-card.out-of-stock .product-img-wrap,
+.product-card.out-of-stock .product-emoji-wrap {
+  opacity: 0.6;
 }
-.cart-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.cart-item:last-child {
-  border-bottom: none;
-}
-.cart-item-info {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex: 1;
-}
-.cart-item-name {
-  font-weight: 500;
-  font-size: 0.88rem;
-  color: var(--text-primary);
-}
-.cart-qty-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-.cart-qty-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-input);
-  color: var(--text-primary);
-  font-size: 0.95rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition);
-}
-.cart-qty-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.cart-qty {
-  font-weight: 600;
-  min-width: 24px;
-  text-align: center;
-}
-.cart-item-subtotal {
-  font-weight: 600;
-  color: var(--accent);
-  min-width: 70px;
-  text-align: right;
-}
-.cart-total {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-  font-size: 1.15rem;
-  font-weight: 700;
-}
-.cart-total-amount {
-  color: var(--accent);
-  font-size: 1.35rem;
-}
-.cart-empty {
-  text-align: center;
-  padding: 2rem;
+.product-card.out-of-stock .product-name {
   color: var(--text-muted);
-  font-size: 0.88rem;
 }
-
-/* ═══ CATEGORY FILTER ═══ */
-.category-filter {
-  display: flex;
-  gap: 0.45rem;
-  margin-bottom: 1.25rem;
-  flex-wrap: wrap;
-}
-.filter-btn {
-  padding: 0.4rem 0.85rem;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  font-family: "Inter", sans-serif;
-  font-size: 0.82rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition);
-}
-.filter-btn:hover {
-  border-color: var(--border-focus);
-  color: var(--text-primary);
-}
-.filter-btn.active {
-  background: var(--accent);
-  color: var(--accent-contrast, #0D1117);
-  border-color: var(--accent);
-  font-weight: 600;
+.product-card.out-of-stock .product-price {
+  color: var(--text-muted);
 }
 
 /* ═══ BUTTONS ═══ */
