@@ -5,6 +5,7 @@ import {
   saveLocal,
   subscribeToChanges,
   unsubscribeAll,
+  getInitialDataSync,
 } from "./db.js";
 
 let state = null;
@@ -12,14 +13,32 @@ let listeners = [];
 let saveTimer = null;
 let dirty = false; // true = มี local changes ที่ยังไม่ได้ save สำเร็จ
 
-// ─── Init ───
+// ─── Instant Sync Init (0ms Blocking) ───
+export function initStoreSync() {
+  if (!state) {
+    state = getInitialDataSync();
+  }
+  return state;
+}
+
+// ─── Async Firebase Init ───
 export async function initStore() {
   unsubscribeAll();
-  state = await loadData();
-  dirty = false;
+  if (!state) {
+    state = getInitialDataSync();
+  }
 
-  // Migration: backfill businessDate on old transactions
-  migrateTransactionBusinessDates();
+  try {
+    const freshData = await loadData();
+    if (freshData) {
+      state = freshData;
+      dirty = false;
+      migrateTransactionBusinessDates();
+      notifyAll();
+    }
+  } catch (e) {
+    console.warn("initStore network fetch failed, using cached state:", e);
+  }
 
   // Listen for Firebase real-time changes
   subscribeToChanges((newData) => {

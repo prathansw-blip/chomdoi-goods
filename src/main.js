@@ -2,6 +2,7 @@
 import "./styles/index.css";
 import {
   initStore,
+  initStoreSync,
   getSettings,
   getActiveShift,
   subscribe,
@@ -114,12 +115,13 @@ const modalObserver = new MutationObserver(() => {
 });
 modalObserver.observe(document.body, { childList: true, subtree: true });
 
-async function boot() {
-  await initStore();
+function boot() {
+  // 1. Instant sync initialization (< 5ms) — renders immediately without blank/loading screen!
+  initStoreSync();
 
   // Apply saved theme & favicon immediately
   const s = getSettings();
-  applyTheme(s.theme || "dark-gold");
+  applyTheme(s.theme || "graphite-gold");
   updateAppFavicon(s.companyLogo);
 
   const user = getCurrentUser();
@@ -128,6 +130,14 @@ async function boot() {
   } else {
     renderApp();
   }
+
+  // 2. Connect to Firebase in background to sync fresh data
+  initStore().then(() => {
+    const newSettings = getSettings();
+    applyTheme(newSettings.theme || "graphite-gold");
+    updateAppFavicon(newSettings.companyLogo);
+  });
+
   subscribe(() => {
     const newSettings = getSettings();
     // ถ้ามี modal เปิดอยู่ ไม่ต้อง re-render header เพราะจะทำให้หน้ากระพริบ
@@ -135,7 +145,7 @@ async function boot() {
       updateHeader();
     }
     // Re-apply theme & favicon when settings change
-    applyTheme(newSettings.theme || "dark-gold");
+    applyTheme(newSettings.theme || "graphite-gold");
     updateAppFavicon(newSettings.companyLogo);
 
     // ถ้าอยู่หน้า login → re-render เพื่อให้ logo/ชื่อ update ตาม Firestore

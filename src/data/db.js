@@ -53,14 +53,43 @@ export function isFirebaseReady() {
 }
 
 // ─── Load Data ───
-function waitForAuth(auth) {
+function waitForAuth(auth, timeoutMs = 1500) {
   return new Promise((resolve) => {
     if (!auth) return resolve(null);
+    let resolved = false;
     const unsub = onAuthStateChanged(auth, (user) => {
-      unsub();
-      resolve(user);
+      if (!resolved) {
+        resolved = true;
+        unsub();
+        resolve(user);
+      }
     });
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        try {
+          unsub();
+        } catch {}
+        resolve(auth.currentUser || null);
+      }
+    }, timeoutMs);
   });
+}
+
+export function getInitialDataSync() {
+  const local = loadLocal();
+  if (local && local.products) {
+    local.settings = { ...defaultSettings, ...local.settings };
+    if (!local.settings.shiftDefinitions)
+      local.settings.shiftDefinitions = defaultSettings.shiftDefinitions;
+    if (!local.settings.categories)
+      local.settings.categories = defaultSettings.categories;
+    if (!local.settings.theme) local.settings.theme = "graphite-gold";
+    if (!local.users || local.users.length === 0)
+      local.users = createDefaultUsers();
+    return local;
+  }
+  return createSeedData();
 }
 
 export async function loadData() {
