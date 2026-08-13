@@ -10,6 +10,7 @@ import {
 } from "../data/store.js";
 import { showToast, formatHour, escapeHtml } from "../utils/utils.js";
 import { testConnection } from "../utils/lineNotify.js";
+import { NavIcons } from "../utils/icons.js";
 import {
   exportData,
   clearAllData,
@@ -462,16 +463,16 @@ function draw(container) {
       <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">แก้ไขชื่อเมนูที่แสดงในแถบนำทาง</p>
       <div style="display:grid;grid-template-columns:60px 1fr;gap:0.5rem 0.75rem;align-items:center">
         ${[
-          { id: "pos", icon: "🛒", def: "ขาย" },
-          { id: "stock", icon: "📦", def: "Stock" },
-          { id: "restock", icon: "➕", def: "เติมของ" },
-          { id: "shift", icon: "📊", def: "สรุปกะ" },
-          { id: "hotel", icon: "🏨", def: "ของใช้" },
-          { id: "settings", icon: "⚙️", def: "ตั้งค่า" },
+          { id: "pos", icon: NavIcons.pos, def: "ขาย" },
+          { id: "stock", icon: NavIcons.stock, def: "Stock" },
+          { id: "restock", icon: NavIcons.restock, def: "เติมของ" },
+          { id: "shift", icon: NavIcons.shift, def: "สรุปกะ" },
+          { id: "hotel", icon: NavIcons.hotel, def: "ของใช้" },
+          { id: "settings", icon: NavIcons.settings, def: "ตั้งค่า" },
         ]
           .map(
             (t) => `
-          <div style="text-align:center;font-size:1.2rem">${t.icon}</div>
+          <div style="display:flex;align-items:center;justify-content:center;color:var(--gold)">${t.icon}</div>
           <input class="form-input s-tab-label" data-tab-id="${t.id}" value="${(s.tabLabels || {})[t.id] || t.def}" placeholder="${t.def}" style="padding:0.4rem 0.6rem">
         `,
           )

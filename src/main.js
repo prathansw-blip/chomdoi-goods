@@ -16,11 +16,12 @@ import { renderRestock, destroyRestock } from "./pages/restock.js";
 import { renderShift, destroyShift } from "./pages/shift.js";
 import { renderHotelSupply, destroyHotelSupply } from "./pages/hotelSupply.js";
 import { renderSettings, destroySettings } from "./pages/settings.js";
+import { NavIcons } from "./utils/icons.js";
 
 const allTabs = [
   {
     id: "pos",
-    icon: "🛒",
+    icon: NavIcons.pos,
     label: "ขาย",
     render: renderPOS,
     destroy: destroyPOS,
@@ -28,7 +29,7 @@ const allTabs = [
   },
   {
     id: "stock",
-    icon: "📦",
+    icon: NavIcons.stock,
     label: "Stock",
     render: renderStock,
     destroy: destroyStock,
@@ -36,7 +37,7 @@ const allTabs = [
   },
   {
     id: "restock",
-    icon: "➕",
+    icon: NavIcons.restock,
     label: "เติมของ",
     render: renderRestock,
     destroy: destroyRestock,
@@ -44,7 +45,7 @@ const allTabs = [
   },
   {
     id: "shift",
-    icon: "📊",
+    icon: NavIcons.shift,
     label: "สรุปกะ",
     render: renderShift,
     destroy: destroyShift,
@@ -52,7 +53,7 @@ const allTabs = [
   },
   {
     id: "hotel",
-    icon: "🏨",
+    icon: NavIcons.hotel,
     label: "ของใช้",
     render: renderHotelSupply,
     destroy: destroyHotelSupply,
@@ -60,7 +61,7 @@ const allTabs = [
   },
   {
     id: "settings",
-    icon: "⚙️",
+    icon: NavIcons.settings,
     label: "ตั้งค่า",
     render: renderSettings,
     destroy: destroySettings,
