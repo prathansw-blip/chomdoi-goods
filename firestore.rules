@@ -1,10 +1,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Only allow operations on the specific store document
     match /stores/{storeId} {
-      // App ใช้ local hash auth ไม่ได้ใช้ Firebase Auth สำหรับ access control
-      // Firebase Auth ใช้เป็น best-effort สำหรับ Firestore access เท่านั้น
-      allow read, write: if true;
+      allow get, list: if storeId == 'chomdoi_main';
+      allow create, update: if storeId == 'chomdoi_main'
+        && request.resource.data.products is list
+        && request.resource.data.settings is map
+        && request.resource.data.users is list;
+      allow delete: if false; // Protect against accidental or malicious complete database wipe
+    }
+
+    // Deny all other collections and documents
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
+
