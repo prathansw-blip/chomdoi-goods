@@ -22,18 +22,59 @@ export function hashPassword(password) {
   return hash.toString(36);
 }
 
+function generateSessionSig(user) {
+  const secret = "chomdoi_secure_sig_v2";
+  const content = `${user.id}:${user.username}:${user.role}:${secret}`;
+  return hashPassword(content);
+}
+
 // ─── Session ───
 export function getCurrentUser() {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (!session || !session.id || !session.username) return null;
+
+    // Validate signature against tampering
+    if (session.sig && session.sig !== generateSessionSig(session)) {
+      console.warn("Session signature mismatch detected. Invalidation triggered.");
+      sessionStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+
+    // Cross-validate with database state if loaded
+    const dbUsers = getUsers();
+    if (dbUsers && dbUsers.length > 0) {
+      const realUser = dbUsers.find(
+        (u) =>
+          u.id === session.id &&
+          u.username.toLowerCase().trim() === session.username.toLowerCase().trim(),
+      );
+      if (!realUser || realUser.active === false) {
+        sessionStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+      // Strictly enforce the real role from database
+      session.role = realUser.role;
+      session.displayName = realUser.displayName;
+    }
+
+    return session;
   } catch {
     return null;
   }
 }
 
 export function setCurrentUser(user) {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  const session = {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    role: user.role,
+    sig: generateSessionSig(user),
+  };
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
 export async function logout() {
@@ -54,7 +95,15 @@ export function isLoggedIn() {
 
 export function isAdmin() {
   const user = getCurrentUser();
-  return user?.role === "admin";
+  if (!user || user.role !== "admin") return false;
+
+  // Extra verification against database
+  const dbUsers = getUsers();
+  if (dbUsers && dbUsers.length > 0) {
+    const realUser = dbUsers.find((u) => u.id === user.id);
+    return realUser?.role === "admin" && realUser?.active !== false;
+  }
+  return user.role === "admin";
 }
 
 // ─── Login Validation ───

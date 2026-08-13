@@ -14,6 +14,7 @@ import {
   getCategoryLabels,
   getCategoryList,
   getStockStatus,
+  escapeHtml,
 } from "../utils/utils.js";
 
 let unsub = null;
@@ -102,7 +103,7 @@ function draw(container) {
               const cats = getCategoryLabels(settings);
               const catLabel = cats[p.category] || p.category;
               return `<tr>
-              <td><span style="display:inline-flex;align-items:center;gap:0.5rem">${p.photo ? `<img src="${p.photo}" style="width:32px;height:32px;border-radius:6px;object-fit:cover">` : `<span>${p.image}</span>`}${p.name}</span></td>
+              <td><span style="display:inline-flex;align-items:center;gap:0.5rem">${p.photo ? `<img src="${p.photo}" style="width:32px;height:32px;border-radius:6px;object-fit:cover">` : `<span>${p.image}</span>`}${escapeHtml(p.name)}</span></td>
               <td>${catLabel}</td>
               <td>${formatCurrency(p.price, currency)}</td>
               <td><strong>${p.stock}</strong></td>

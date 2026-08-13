@@ -20,6 +20,7 @@ import {
   getStockStatus,
   getProductIcon,
   getBusinessDate,
+  escapeHtml,
 } from "../utils/utils.js";
 import {
   sendLowStockAlert,
@@ -96,10 +97,10 @@ function draw(container) {
               <div class="product-card ${p.stock <= 0 ? "out-of-stock" : ""}" data-id="${p.id}">
                 ${
                   p.photo
-                    ? `<img src="${p.photo}" alt="${p.name}" style="width:56px;height:56px;border-radius:8px;object-fit:cover;margin-bottom:0.4rem">`
+                    ? `<img src="${p.photo}" alt="${escapeHtml(p.name)}" style="width:56px;height:56px;border-radius:8px;object-fit:cover;margin-bottom:0.4rem">`
                     : `<div class="product-emoji">${getProductIcon(p, settings)}</div>`
                 }
-                <div class="product-name">${p.name}</div>
+                <div class="product-name">${escapeHtml(p.name)}</div>
                 <div class="product-price">${formatCurrency(p.price, currency)}</div>
                 <div class="product-stock ${ss.class}">${ss.label}</div>
               </div>`;
@@ -122,7 +123,7 @@ function draw(container) {
                 <div class="cart-item">
                   <div class="cart-item-info">
                     <span>${c.image}</span>
-                    <span class="cart-item-name">${c.name}</span>
+                    <span class="cart-item-name">${escapeHtml(c.name)}</span>
                   </div>
                   <div class="cart-qty-controls">
                     <button class="cart-qty-btn" data-action="dec" data-idx="${i}">−</button>
@@ -500,10 +501,10 @@ function buildShiftSummary(settings, currency) {
                     .map(
                       (item, itemIdx) => `
                     <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;background:rgba(255,255,255,0.03);padding:0.25rem 0.45rem;border-radius:4px">
-                      <span style="color:var(--text-secondary)">${item.name} <strong style="color:var(--gold)">×${item.qty}</strong></span>
+                      <span style="color:var(--text-secondary)">${escapeHtml(item.name)} <strong style="color:var(--gold)">×${item.qty}</strong></span>
                       <div style="display:flex;align-items:center;gap:0.35rem">
                         <span style="color:var(--text-muted);font-size:0.75rem">${formatCurrency(item.subtotal, currency)}</span>
-                        <button class="btn-del-single-subitem" data-txnid="${t.id}" data-itemidx="${itemIdx}" data-itemname="${item.name}" data-itemqty="${item.qty}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.85rem;padding:0 0.15rem;line-height:1" title="ลบเฉพาะ ${item.name} ×${item.qty}">✕</button>
+                        <button class="btn-del-single-subitem" data-txnid="${t.id}" data-itemidx="${itemIdx}" data-itemname="${escapeHtml(item.name)}" data-itemqty="${item.qty}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.85rem;padding:0 0.15rem;line-height:1" title="ลบเฉพาะ ${escapeHtml(item.name)} ×${item.qty}">✕</button>
                       </div>
                     </div>
                   `,
@@ -555,7 +556,7 @@ function showDeleteTxnModal(txnId, container) {
               (item, idx) => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0.75rem;background:var(--bg-input);border-radius:var(--radius-sm);border:1px solid rgba(148,163,184,0.1)">
               <div style="flex:1;min-width:0;margin-right:0.5rem">
-                <div style="font-weight:600;color:var(--text-primary);font-size:0.88rem">${item.name} <span style="color:var(--gold)">×${item.qty}</span></div>
+                <div style="font-weight:600;color:var(--text-primary);font-size:0.88rem">${escapeHtml(item.name)} <span style="color:var(--gold)">×${item.qty}</span></div>
                 <div style="font-size:0.75rem;color:var(--text-muted)">ชิ้นละ ${formatCurrency(item.price, currency)} · รวม ${formatCurrency(item.subtotal, currency)}</div>
               </div>
               <button class="btn btn-outline btn-del-subitem" data-idx="${idx}" style="padding:0.25rem 0.55rem;font-size:0.75rem;color:var(--red);border-color:rgba(239,68,68,0.3)" title="ลบเฉพาะรายการนี้ (คืน Stock)">🗑️ ลบเฉพาะรายการนี้</button>

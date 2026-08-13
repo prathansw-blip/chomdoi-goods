@@ -12,6 +12,7 @@ import {
   showToast,
   getStockStatus,
   getProductIcon,
+  escapeHtml,
 } from "../utils/utils.js";
 import { getRestockLogs } from "../data/store.js";
 
@@ -44,7 +45,7 @@ function draw(container) {
             ${products
               .map((p) => {
                 const ss = getStockStatus(p);
-                return `<option value="${p.id}">${getProductIcon(p, settings)} ${p.name} (คงเหลือ: ${p.stock})</option>`;
+                return `<option value="${p.id}">${getProductIcon(p, settings)} ${escapeHtml(p.name)} (คงเหลือ: ${p.stock})</option>`;
               })
               .join("")}
           </select>
@@ -57,7 +58,7 @@ function draw(container) {
           <label class="form-label">เติมโดย <span style="color:var(--red)">*</span></label>
           <select class="form-select" id="rs-user">
             <option value="">— เลือกผู้เติม —</option>
-            ${users.map((u) => `<option value="${u.id}">${u.displayName}</option>`).join("")}
+            ${users.map((u) => `<option value="${u.id}">${escapeHtml(u.displayName)}</option>`).join("")}
           </select>
         </div>
         <div class="form-group">
@@ -78,8 +79,8 @@ function draw(container) {
                 (l) => `
               <div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 0;border-bottom:1px solid var(--border)">
                 <div>
-                  <div style="font-weight:600;font-size:0.9rem">${l.productName || "—"}</div>
-                  <div style="font-size:0.8rem;color:var(--text-muted)">${formatDateTime(l.timestamp)}${l.restockedBy ? " • 👤 " + l.restockedBy : ""}${l.note ? " • " + l.note : ""}</div>
+                  <div style="font-weight:600;font-size:0.9rem">${escapeHtml(l.productName) || "—"}</div>
+                  <div style="font-size:0.8rem;color:var(--text-muted)">${formatDateTime(l.timestamp)}${l.restockedBy ? " • 👤 " + escapeHtml(l.restockedBy) : ""}${l.note ? " • " + escapeHtml(l.note) : ""}</div>
                 </div>
                 <span class="badge badge-success">+${l.quantity}</span>
               </div>

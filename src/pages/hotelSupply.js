@@ -13,7 +13,7 @@ import {
   subscribe,
   getSettings,
 } from "../data/store.js";
-import { generateId, showToast, formatDate } from "../utils/utils.js";
+import { generateId, showToast, formatDate, escapeHtml } from "../utils/utils.js";
 import { isAdmin, getCurrentUser } from "../utils/auth.js";
 import { sendSupplyCheckNotification } from "../utils/lineNotify.js";
 

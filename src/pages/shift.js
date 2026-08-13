@@ -24,6 +24,7 @@ import {
   formatBusinessDate,
   getCurrentShiftDef,
   formatHour,
+  escapeHtml,
 } from "../utils/utils.js";
 import {
   sendShiftReport,

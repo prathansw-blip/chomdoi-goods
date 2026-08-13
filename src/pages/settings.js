@@ -8,7 +8,7 @@ import {
   updateUser,
   deleteUser,
 } from "../data/store.js";
-import { showToast, formatHour } from "../utils/utils.js";
+import { showToast, formatHour, escapeHtml } from "../utils/utils.js";
 import { testConnection } from "../utils/lineNotify.js";
 import {
   exportData,
@@ -292,8 +292,13 @@ function draw(container) {
 
     <!-- LINE Bot -->
     <div class="settings-section">
-      <div class="settings-section-title">💬 เชื่อมต่อ LINE Bot</div>
-      <div class="form-group"><label class="form-label">Channel Access Token</label><input class="form-input" id="s-line-token" value="${s.line?.channelAccessToken || ""}" placeholder="Long-lived token"></div>
+      <div class="form-group">
+        <label class="form-label">Channel Access Token</label>
+        <div style="position:relative">
+          <input class="form-input" id="s-line-token" type="password" value="${s.line?.channelAccessToken || ""}" placeholder="Long-lived token" style="padding-right:2.8rem">
+          <button type="button" id="btn-toggle-line-token" style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--text-muted)">👁️</button>
+        </div>
+      </div>
       <div class="form-group"><label class="form-label">User ID / Group ID</label><input class="form-input" id="s-line-target" value="${s.line?.targetId || ""}" placeholder="U... หรือ C..."></div>
       <label class="checkbox-label" style="margin-top:0.5rem">
         <input type="checkbox" id="s-line-enabled" ${lineEnabled ? "checked" : ""}>
@@ -601,6 +606,23 @@ function draw(container) {
       }
     };
   });
+
+  const toggleLineTokenBtn = document.getElementById("btn-toggle-line-token");
+  if (toggleLineTokenBtn) {
+    toggleLineTokenBtn.onclick = () => {
+      const input = document.getElementById("s-line-token");
+      if (input) {
+        if (input.type === "password") {
+          input.type = "text";
+          toggleLineTokenBtn.textContent = "🙈";
+        } else {
+          input.type = "password";
+          toggleLineTokenBtn.textContent = "👁️";
+        }
+      }
+    };
+  }
+
   container.querySelectorAll(".btn-del-user").forEach((btn) => {
     btn.onclick = () => {
       const uid = btn.dataset.uid;
