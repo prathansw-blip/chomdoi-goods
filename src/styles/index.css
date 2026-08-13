@@ -1337,8 +1337,20 @@ body.modal-open .page-content {
   border: 1px solid rgba(56, 189, 248, 0.25);
 }
 
+/* ═══ RESTOCK LAYOUT ═══ */
+.restock-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
 /* ═══ RESPONSIVE MOBILE STYLES ═══ */
 @media (max-width: 768px) {
+  .restock-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
   .app-header {
     padding: 0.5rem 0.75rem;
     display: flex;
