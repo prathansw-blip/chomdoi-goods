@@ -1,5 +1,5 @@
 // login.js — Login Page
-import { getUsers, getSettings } from "../data/store.js";
+import { getSettings } from "../data/store.js";
 import { login } from "../utils/auth.js";
 
 export function renderLogin(onSuccess) {
@@ -72,10 +72,9 @@ export function renderLogin(onSuccess) {
     btn.disabled = true;
     btn.textContent = "⏳ กำลังตรวจสอบ...";
 
-    const users = getUsers();
-    const user = await login(users, username, password);
+    const user = await login(username, password);
     if (user) {
-      onSuccess(user);
+      await onSuccess(user);
     } else {
       errorEl.textContent =
         "❌ Username หรือ Password ไม่ถูกต้อง (หรือยังไม่เปิดใช้งาน)";

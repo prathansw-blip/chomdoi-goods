@@ -62,6 +62,17 @@ export function showToast(message, type = "success", duration = 3000) {
   }, duration);
 }
 
+export function showWriteError(error) {
+  const message = String(error?.message || "");
+  if (message.startsWith("SYNC_CONFLICT")) {
+    showToast("ข้อมูลเปลี่ยนจากเครื่องอื่น กรุณาเปิดหน้าล่าสุดแล้วลองอีกครั้ง", "error", 5000);
+  } else if (error?.code === "permission-denied") {
+    showToast("บัญชีนี้ไม่มีสิทธิ์บันทึกรายการนี้", "error", 5000);
+  } else {
+    showToast("บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง", "error", 5000);
+  }
+}
+
 // Category labels — built from settings.categories
 const defaultCategories = [
   { id: "water", name: "น้ำดื่ม", icon: "💧" },

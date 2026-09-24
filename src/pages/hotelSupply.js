@@ -12,8 +12,9 @@ import {
   getUsers,
   subscribe,
   getSettings,
+  getSyncStatus,
 } from "../data/store.js";
-import { generateId, showToast, formatDate, escapeHtml } from "../utils/utils.js";
+import { generateId, showToast, showWriteError, formatDate, escapeHtml } from "../utils/utils.js";
 import { isAdmin, getCurrentUser } from "../utils/auth.js";
 import { sendSupplyCheckNotification } from "../utils/lineNotify.js";
 
@@ -24,7 +25,7 @@ export function renderHotelSupply(container) {
   if (unsub) unsub();
   draw(container);
   unsub = subscribe(() => {
-    if (!document.querySelector(".modal-overlay")) draw(container);
+    if (!document.querySelector(".modal-overlay") && !getSyncStatus().pending) draw(container);
   });
 }
 
@@ -234,12 +235,18 @@ function drawCheck(el, supplies, checks, today, isEditing = false) {
   // Bind Reset button
   const resetBtn = document.getElementById("btn-reset-check");
   if (resetBtn) {
-    resetBtn.onclick = () => {
+    resetBtn.onclick = async () => {
       const confirmReset = confirm("ต้องการล้างค่านับของวันนี้ทั้งหมด เพื่อเริ่มกรอกใหม่ใช่หรือไม่?");
       if (confirmReset) {
-        deleteSupplyCheck(today);
-        showToast("ล้างค่านับของวันนี้เรียบร้อยแล้ว คุณสามารถกรอกตัวเลขใหม่ได้ทันที", "success");
-        drawCheck(el, supplies, getSupplyChecks(), today, false);
+        resetBtn.disabled = true;
+        try {
+          await deleteSupplyCheck(today, todayCheck || null);
+          showToast("ล้างค่านับของวันนี้เรียบร้อยแล้ว คุณสามารถกรอกตัวเลขใหม่ได้ทันที", "success");
+          drawCheck(el, getHotelSupplies(), getSupplyChecks(), today, false);
+        } catch (error) {
+          showWriteError(error);
+          resetBtn.disabled = false;
+        }
       }
     };
   }
@@ -263,7 +270,7 @@ function drawCheck(el, supplies, checks, today, isEditing = false) {
   // Save check event
   const saveBtn = document.getElementById("btn-save-check");
   if (saveBtn) {
-    saveBtn.onclick = () => {
+    saveBtn.onclick = async () => {
       const userSelect = document.getElementById("check-user-select");
       if (!userSelect.value) {
         showToast("กรุณาเลือกผู้เช็ค", "error");
@@ -284,13 +291,20 @@ function drawCheck(el, supplies, checks, today, isEditing = false) {
         showToast("กรุณากรอกจำนวนให้ครบทุกรายการ", "error");
         return;
       }
-      addSupplyCheck({
-        id: generateId("scheck"),
-        date: today,
-        items,
-        checkedBy: user ? { id: user.id, displayName: user.displayName } : null,
-        timestamp: new Date().toISOString(),
-      });
+      saveBtn.disabled = true;
+      try {
+        await addSupplyCheck({
+          id: generateId("scheck"),
+          date: today,
+          items,
+          checkedBy: user ? { id: user.id, displayName: user.displayName } : null,
+          timestamp: new Date().toISOString(),
+        }, todayCheck || null);
+      } catch (error) {
+        showWriteError(error);
+        saveBtn.disabled = false;
+        return;
+      }
 
       // Send LINE notification
       const prevCheck = checks
@@ -331,7 +345,7 @@ function drawCheck(el, supplies, checks, today, isEditing = false) {
       });
 
       showToast(todayCheck ? "บันทึกการแก้ไขสำเร็จ ✅" : "บันทึกการเช็คสำเร็จ ✅", "success");
-      drawCheck(el, supplies, getSupplyChecks(), today, false);
+      drawCheck(el, getHotelSupplies(), getSupplyChecks(), today, false);
     };
   }
 }
@@ -404,7 +418,7 @@ function drawRestock(el, supplies) {
     }
   `;
 
-  document.getElementById("btn-restock-supply").onclick = () => {
+  document.getElementById("btn-restock-supply").onclick = async (event) => {
     const supplyId = document.getElementById("rs-supply").value;
     const qty = +document.getElementById("rs-qty").value;
     const userId = document.getElementById("rs-user").value;
@@ -418,15 +432,22 @@ function drawRestock(el, supplies) {
     }
     const user = getUsers().find((u) => u.id === userId);
     const supply = supplies.find((s) => s.id === supplyId);
-    addSupplyRestock({
-      id: generateId("srestock"),
-      supplyId,
-      qty,
-      date: getToday(),
-      restocker: user?.displayName || "-",
-      timestamp: new Date().toISOString(),
-    });
-    showToast(`เติม ${supply?.name} +${qty} ${supply?.unit} สำเร็จ`, "success");
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      await addSupplyRestock({
+        id: generateId("srestock"),
+        supplyId,
+        qty,
+        date: getToday(),
+        restocker: user?.displayName || "-",
+        timestamp: new Date().toISOString(),
+      });
+      showToast(`เติม ${supply?.name} +${qty} ${supply?.unit} สำเร็จ`, "success");
+    } catch (error) {
+      showWriteError(error);
+      button.disabled = false;
+    }
   };
 }
 
@@ -560,11 +581,17 @@ function drawManage(el, supplies, container) {
     btn.onclick = () => showSupplyModal(container, btn.dataset.editSupply);
   });
   el.querySelectorAll("[data-del-supply]").forEach((btn) => {
-    btn.onclick = () => {
+    btn.onclick = async () => {
       const s = supplies.find((x) => x.id === btn.dataset.delSupply);
       if (s && confirm(`ลบ "${s.name}" ?`)) {
-        deleteHotelSupply(s.id);
-        showToast(`ลบ "${s.name}" แล้ว`, "info");
+        btn.disabled = true;
+        try {
+          await deleteHotelSupply(s.id, s);
+          showToast(`ลบ "${s.name}" แล้ว`, "info");
+        } catch (error) {
+          showWriteError(error);
+          btn.disabled = false;
+        }
       }
     };
   });
@@ -594,7 +621,7 @@ function showSupplyModal(container, editId = null) {
   overlay.onclick = (e) => {
     if (e.target === overlay) overlay.remove();
   };
-  overlay.querySelector("#ms-save").onclick = () => {
+  overlay.querySelector("#ms-save").onclick = async (event) => {
     const name = document.getElementById("ms-name").value.trim();
     const unit = document.getElementById("ms-unit").value.trim();
     const icon = document.getElementById("ms-icon").value.trim() || "📦";
@@ -604,20 +631,27 @@ function showSupplyModal(container, editId = null) {
       showToast("กรุณากรอกชื่อรายการ", "error");
       return;
     }
-    if (existing) {
-      updateHotelSupply(editId, { name, unit, icon, lowStockThreshold });
-      showToast("แก้ไขสำเร็จ", "success");
-    } else {
-      addHotelSupply({
-        id: generateId("hsupply"),
-        name,
-        unit,
-        icon,
-        lowStockThreshold,
-      });
-      showToast("เพิ่มรายการสำเร็จ", "success");
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      if (existing) {
+        await updateHotelSupply(editId, { name, unit, icon, lowStockThreshold }, existing);
+        showToast("แก้ไขสำเร็จ", "success");
+      } else {
+        await addHotelSupply({
+          id: generateId("hsupply"),
+          name,
+          unit,
+          icon,
+          lowStockThreshold,
+        });
+        showToast("เพิ่มรายการสำเร็จ", "success");
+      }
+      overlay.remove();
+    } catch (error) {
+      showWriteError(error);
+      button.disabled = false;
     }
-    overlay.remove();
   };
 }
 

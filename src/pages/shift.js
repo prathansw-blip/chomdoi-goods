@@ -11,6 +11,7 @@ import {
   subscribe,
   getSettings,
   getUsers,
+  getSyncStatus,
 } from "../data/store.js";
 import { isAdmin, getCurrentUser } from "../utils/auth.js";
 import {
@@ -20,6 +21,7 @@ import {
   formatTime,
   formatDateTime,
   showToast,
+  showWriteError,
   getBusinessDate,
   formatBusinessDate,
   getCurrentShiftDef,
@@ -91,7 +93,7 @@ export function renderShift(container) {
   selectedHistoryMonth = null;
   draw(container);
   unsub = subscribe(() => {
-    if (!document.querySelector(".modal-overlay")) draw(container);
+    if (!document.querySelector(".modal-overlay") && !getSyncStatus().pending) draw(container);
   });
 }
 
@@ -343,22 +345,30 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
       overlay.onclick = (e) => {
         if (e.target === overlay) overlay.remove();
       };
-      overlay.querySelector("#open-confirm").onclick = () => {
+      overlay.querySelector("#open-confirm").onclick = async (event) => {
+        const button = event.currentTarget;
         const openerId = document.getElementById("opener-select").value;
         const opener = users.find((u) => u.id === openerId);
-        startShift({
-          id: generateId("shift"),
-          defId: def.id,
-          name: def.name,
-          icon: def.icon,
-          startTime: new Date().toISOString(),
-          endTime: null,
-          status: "active",
-          businessDate: getBusinessDate(new Date(), startHour),
-          openedBy: opener
-            ? { id: opener.id, displayName: opener.displayName }
-            : null,
-        });
+        button.disabled = true;
+        try {
+          await startShift({
+            id: generateId("shift"),
+            defId: def.id,
+            name: def.name,
+            icon: def.icon,
+            startTime: new Date().toISOString(),
+            endTime: null,
+            status: "active",
+            businessDate: getBusinessDate(new Date(), startHour),
+            openedBy: opener
+              ? { id: opener.id, displayName: opener.displayName }
+              : null,
+          }, active?.id || null);
+        } catch (error) {
+          showWriteError(error);
+          button.disabled = false;
+          return;
+        }
         sendShiftOpenNotification({
           name: `${def.icon} ${def.name}`,
           date: formatBusinessDate(getBusinessDate(new Date(), startHour)),
@@ -410,31 +420,47 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
       overlay.onclick = (e) => {
         if (e.target === overlay) overlay.remove();
       };
-      overlay.querySelector("#cs-confirm").onclick = () => {
+      overlay.querySelector("#cs-confirm").onclick = async (event) => {
+        const button = event.currentTarget;
         const closerId = document.getElementById("closer-select").value;
         const closer = users.find((u) => u.id === closerId);
-        closeShift(
-          active.id,
-          closer ? { id: closer.id, displayName: closer.displayName } : null,
-        );
-        const prods = getProducts();
+        button.disabled = true;
+        let confirmed;
+        try {
+          confirmed = await closeShift(
+            active.id,
+            closer ? { id: closer.id, displayName: closer.displayName } : null,
+          );
+        } catch (error) {
+          showWriteError(error);
+          button.disabled = false;
+          return;
+        }
+        const confirmedShift = confirmed.shifts.find((s) => s.id === active.id);
+        const confirmedTxns = confirmed.transactions.filter((t) => t.shiftId === active.id);
+        const confirmedPb = paymentBreakdown(confirmedTxns);
+        const itemCounts = new Map();
+        confirmedTxns.forEach((txn) => txn.items.forEach((item) =>
+          itemCounts.set(item.name, (itemCounts.get(item.name) || 0) + item.qty)));
+        const ranked = [...itemCounts.entries()].sort((a, b) => b[1] - a[1]);
+        const confirmedTopProduct = ranked[0] ? `${ranked[0][0]} (${ranked[0][1]} ชิ้น)` : "—";
+        const prods = confirmed.products;
         const lowStockItems = prods.filter(
           (p) => p.stock > 0 && p.stock <= (p.lowStockThreshold || 5),
         );
-        const shiftPbReport = paymentBreakdown(shiftTxns);
         sendShiftReport({
           name: active.name,
           date: formatBusinessDate(
             getBusinessDate(active.startTime, startHour),
           ),
           startTime: formatTime(active.startTime),
-          endTime: formatTime(new Date().toISOString()),
-          totalSales: shiftTotal,
-          cash: shiftPbReport.cash,
-          transfer: shiftPbReport.transfer,
-          free: shiftPbReport.free,
-          totalBills: shiftBills,
-          topProduct,
+          endTime: formatTime(confirmedShift.endTime),
+          totalSales: confirmedPb.total,
+          cash: confirmedPb.cash,
+          transfer: confirmedPb.transfer,
+          free: confirmedPb.free,
+          totalBills: confirmedTxns.length,
+          topProduct: confirmedTopProduct,
           lowStockItems,
           closedBy: closer?.displayName,
         });
@@ -443,14 +469,14 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
         const lastShiftDef = shiftDefs[shiftDefs.length - 1];
         if (lastShiftDef && active.defId === lastShiftDef.id) {
           const todayBizDate = getBusinessDate(active.startTime, startHour);
-          const allTransactions = getTransactions();
+          const allTransactions = confirmed.transactions;
           const dayTxns = allTransactions.filter(
             (t) =>
               (t.businessDate || getBusinessDate(t.timestamp, startHour)) ===
               todayBizDate,
           );
           const dayPb = paymentBreakdown(dayTxns);
-          const dayShiftsAll = getShifts().filter(
+          const dayShiftsAll = confirmed.shifts.filter(
             (s) =>
               (s.businessDate || getBusinessDate(s.startTime, startHour)) ===
               todayBizDate,
@@ -480,6 +506,8 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
   el.querySelectorAll(".btn-del-shift").forEach((btn) => {
     btn.onclick = () => {
       const sid = btn.dataset.sid;
+      const displayedShift = getShifts().find((item) => item.id === sid);
+      const displayedTransactions = getTransactions().filter((item) => item.shiftId === sid);
       const sname = btn.dataset.sname;
       const stotal = btn.dataset.stotal;
       const sbills = btn.dataset.sbills;
@@ -491,7 +519,7 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
           <div style="margin:1rem 0">
             <p style="font-size:0.95rem;color:var(--text-primary)">ต้องการลบกะนี้?</p>
             <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);padding:0.75rem;margin-top:0.75rem">
-              <p style="color:var(--red);font-weight:600;font-size:0.9rem">⚠️ ยอดขาย ${formatCurrency(+stotal, currency)} (${sbills} bills) จะหายไปด้วย</p>
+              <p style="color:var(--red);font-weight:600;font-size:0.9rem">⚠️ ยอดขาย ${formatCurrency(+stotal, currency)} (${sbills} bills) จะหายไป และสินค้าจะคืนเข้า Stock</p>
               <p style="color:var(--text-muted);font-size:0.8rem;margin-top:0.3rem">การลบนี้ไม่สามารถยกเลิกได้</p>
             </div>
           </div>
@@ -506,11 +534,18 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
       overlay.onclick = (e) => {
         if (e.target === overlay) overlay.remove();
       };
-      overlay.querySelector("#dsh-confirm").onclick = () => {
-        deleteShift(sid);
-        showToast(`ลบกะ "${sname}" + ${sbills} bills แล้ว`, "info");
-        overlay.remove();
-        draw(el.closest(".page-content"));
+      overlay.querySelector("#dsh-confirm").onclick = async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        try {
+          await deleteShift(sid, displayedShift, displayedTransactions);
+          showToast(`ลบกะ "${sname}" + ${sbills} bills แล้ว`, "info");
+          overlay.remove();
+          draw(el.closest(".page-content"));
+        } catch (error) {
+          showWriteError(error);
+          button.disabled = false;
+        }
       };
     };
   });
@@ -595,14 +630,21 @@ function showBillsModal(shiftId, shiftName, currency) {
   document.body.appendChild(overlay);
 
   overlay.querySelectorAll(".btn-del-txn-shift").forEach((btn) => {
-    btn.onclick = () => {
+    btn.onclick = async () => {
       const txnId = btn.dataset.txnid;
       const txn = getTransactions().find((t) => t.id === txnId);
       if (!txn) return;
       const itemsText = txn.items.map((i) => `${i.name} ×${i.qty}`).join(", ");
       const delConfirm = confirm(`ต้องการลบรายการขาย "${itemsText}" (ยอด ${formatCurrency(txn.total, currency)}) และคืนสินค้าเข้า Stock หรือไม่?`);
       if (delConfirm) {
-        deleteTransaction(txnId);
+        btn.disabled = true;
+        try {
+          await deleteTransaction(txnId, txn);
+        } catch (error) {
+          showWriteError(error);
+          btn.disabled = false;
+          return;
+        }
         showToast("ลบรายการขายและคืนสินค้าเข้า Stock เรียบร้อย", "success");
         overlay.remove();
         showBillsModal(shiftId, shiftName, currency);

@@ -5,6 +5,7 @@ import {
   subscribe,
   getSettings,
   getUsers,
+  getSyncStatus,
 } from "../data/store.js";
 import {
   generateId,
@@ -22,7 +23,7 @@ export function renderRestock(container) {
   if (unsub) unsub();
   draw(container);
   unsub = subscribe(() => {
-    if (!document.querySelector(".modal-overlay")) draw(container);
+    if (!document.querySelector(".modal-overlay") && !getSyncStatus().pending) draw(container);
   });
 }
 
@@ -102,7 +103,7 @@ function draw(container) {
     document.head.appendChild(s);
   }
 
-  document.getElementById("btn-restock").onclick = () => {
+  document.getElementById("btn-restock").onclick = async () => {
     const productId = document.getElementById("rs-product").value;
     const qty = +document.getElementById("rs-qty").value;
     const note = document.getElementById("rs-note").value.trim();
@@ -121,7 +122,10 @@ function draw(container) {
     }
     const product = getProducts().find((p) => p.id === productId);
     const user = users.find((u) => u.id === userId);
-    addRestockLog({
+    const button = document.getElementById("btn-restock");
+    button.disabled = true;
+    try {
+      await addRestockLog({
       id: generateId("rst"),
       productId,
       productName: product?.name || "",
@@ -130,12 +134,16 @@ function draw(container) {
       restockedBy: user?.displayName || "",
       restockedById: userId,
       note,
-    });
-    showToast(
-      `เติม ${product?.name} จำนวน ${qty} ชิ้น โดย ${user?.displayName} สำเร็จ`,
-      "success",
-    );
-    draw(container);
+      });
+      showToast(
+        `เติม ${product?.name} จำนวน ${qty} ชิ้น โดย ${user?.displayName} สำเร็จ`,
+        "success",
+      );
+      draw(container);
+    } catch {
+      showToast("ยังบันทึกการเติมสินค้าไม่ได้ กรุณาตรวจการเชื่อมต่อและลองอีกครั้ง", "error");
+      button.disabled = false;
+    }
   };
 }
 

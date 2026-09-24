@@ -1,5 +1,4 @@
 // ข้อมูลสินค้าเริ่มต้น — Chomdoi Goods
-import { hashPassword } from "../utils/auth.js";
 
 export const seedProducts = [
   // 💧 น้ำดื่ม
@@ -142,23 +141,6 @@ export const seedProducts = [
   },
 ];
 
-// Default users — admin account
-export function createDefaultUsers() {
-  return [
-    {
-      id: "user_admin",
-      username: "admin",
-      displayName: "Admin",
-      passwordHash: hashPassword("admin1234"),
-      plainPassword: "admin1234",
-      password: "admin1234",
-      role: "admin",
-      active: true,
-      createdAt: new Date().toISOString(),
-    },
-  ];
-}
-
 export const defaultSettings = {
   companyName: "Chomdoi Goods",
   companyLogo: null,
@@ -191,7 +173,6 @@ export const defaultSettings = {
     { id: "beer", name: "เบียร์", icon: "🍺" },
   ],
   line: {
-    channelAccessToken: null,
     targetId: null,
     enabled: false,
     notifications: {

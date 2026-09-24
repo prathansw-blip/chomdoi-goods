@@ -1,183 +1,179 @@
-// db.js — Data persistence layer (Firebase Firestore + localStorage fallback)
+// Firestore persistence. Financial data is never sourced from a browser cache.
 import { initializeApp } from "firebase/app";
 import {
-  getFirestore,
+  collection,
   doc,
-  getDoc,
-  setDoc,
+  getDocFromServer,
+  getDocsFromServer,
+  getFirestore,
+  connectFirestoreEmulator,
   onSnapshot,
+  runTransaction,
 } from "firebase/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import {
-  seedProducts,
-  defaultSettings,
-  createDefaultUsers,
-} from "./seedData.js";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { defaultSettings } from "./seedData.js";
+import { applySale, retryRevisionTransaction } from "./sale.js";
+import { applyRestock } from "./restock.js";
+import { applyStoreOperation } from "./operations.js";
 
 let db = null;
 let app = null;
 let auth = null;
 let unsubscribers = [];
-const STORE_ID = "chomdoi_main"; // single-store document id
+let latestExportData = null;
+const STORE_ID = "chomdoi_main";
 const LS_KEY = "chomdoi_goods_data";
 
-// ─── Hard-coded Firebase config (ให้ทุกเครื่องเชื่อม Firestore ได้ทันที) ───
-export const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCDW74wCwmZTyaFToZPLeEtk0piTLF40n0",
-  authDomain: "chomdoi-house.firebaseapp.com",
-  projectId: "chomdoi-house",
-};
+const emulatorMode = import.meta.env.MODE === "emulator";
+export const FIREBASE_CONFIG = emulatorMode
+  ? {
+      apiKey: "demo-key",
+      authDomain: "demo-chomdoi-tests.firebaseapp.com",
+      projectId: "demo-chomdoi-tests",
+    }
+  : {
+      apiKey: "AIzaSyCDW74wCwmZTyaFToZPLeEtk0piTLF40n0",
+      authDomain: "chomdoi-house.firebaseapp.com",
+      projectId: "chomdoi-house",
+    };
 
-// ─── Firebase Init ───
-export function initFirebase(config) {
-  try {
-    if (app) return db;
-    app = initializeApp(config);
-    db = getFirestore(app);
-    auth = getAuth(app);
-    return db;
-  } catch (e) {
-    console.error("Firebase init failed:", e);
-    return null;
+export function initFirebase(config = FIREBASE_CONFIG) {
+  if (app) return db;
+  if (emulatorMode && import.meta.env.PROD) {
+    throw new Error("Emulator mode cannot run in a production build");
   }
-}
-
-export function getDb() {
+  app = initializeApp(config);
+  db = getFirestore(app);
+  auth = getAuth(app);
+  if (emulatorMode) {
+    if (typeof window !== "undefined" && !["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+      throw new Error("Emulator mode is restricted to localhost");
+    }
+    connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  }
   return db;
 }
-export function getFirebaseAuth() {
-  return auth;
-}
-export function isFirebaseReady() {
-  return db !== null;
+
+export function getDb() { return db; }
+export function getFirebaseAuth() { return auth; }
+export function isFirebaseReady() { return db !== null; }
+
+function requireSignedIn() {
+  initFirebase();
+  if (!auth.currentUser) throw new Error("Sign in before accessing store data");
+  return db;
 }
 
-// ─── Load Data ───
-function waitForAuth(auth, timeoutMs = 1500) {
-  return new Promise((resolve) => {
-    if (!auth) return resolve(null);
-    let resolved = false;
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (!resolved) {
-        resolved = true;
-        unsub();
-        resolve(user);
-      }
-    });
-    setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        try {
-          unsub();
-        } catch {}
-        resolve(auth.currentUser || null);
-      }
-    }, timeoutMs);
-  });
+function publicStore(data) {
+  const clean = structuredClone(data);
+  delete clean.users;
+  clean.revision = Number.isSafeInteger(clean.revision) && clean.revision >= 0
+    ? clean.revision : 0;
+  return clean;
+}
+
+function userFromStaff(docSnapshot) {
+  const staff = docSnapshot.data();
+  return {
+    id: staff.legacyId,
+    uid: docSnapshot.id,
+    username: staff.username,
+    displayName: staff.displayName,
+    role: staff.role,
+    active: staff.active,
+  };
 }
 
 export function getInitialDataSync() {
-  const local = loadLocal();
-  if (local && local.products) {
-    local.settings = { ...defaultSettings, ...local.settings };
-    if (!local.settings.shiftDefinitions)
-      local.settings.shiftDefinitions = defaultSettings.shiftDefinitions;
-    if (!local.settings.categories)
-      local.settings.categories = defaultSettings.categories;
-    if (!local.settings.theme) local.settings.theme = "graphite-gold";
-    if (!local.users || local.users.length === 0)
-      local.users = createDefaultUsers();
-    return local;
-  }
-  return createSeedData();
+  return {
+    products: [],
+    transactions: [],
+    restockLogs: [],
+    shifts: [],
+    users: [],
+    settings: structuredClone(defaultSettings),
+  };
 }
 
 export async function loadData() {
-  // ── ALWAYS try Firebase first (hard-coded config) ──
-  const localSettings = loadLocal()?.settings;
-  const fbConfig =
-    localSettings?.firebase?.configured && localSettings.firebase.projectId
-      ? {
-          apiKey: localSettings.firebase.apiKey,
-          authDomain: localSettings.firebase.authDomain,
-          projectId: localSettings.firebase.projectId,
-        }
-      : FIREBASE_CONFIG;
-
-  try {
-    const fbDb = initFirebase(fbConfig);
-    if (fbDb) {
-      await waitForAuth(auth); // Wait for auth state to be restored
-      const snap = await getDoc(doc(fbDb, "stores", STORE_ID));
-      if (snap.exists()) {
-        const data = snap.data();
-        // Ensure firebase config is always set
-        if (!data.settings.firebase?.configured) {
-          data.settings.firebase = { ...fbConfig, configured: true };
-        }
-        saveLocal(data);
-        return data;
-      } else {
-        // Firestore is empty — push current local data or seed data
-        const local = loadLocal();
-        const base = local && local.products ? local : createSeedData();
-        base.settings.firebase = { ...fbConfig, configured: true };
-        await setDoc(
-          doc(fbDb, "stores", STORE_ID),
-          JSON.parse(JSON.stringify(base)),
-        );
-        saveLocal(base);
-        return base;
-      }
-    }
-  } catch (e) {
-    console.warn("Firebase load failed, falling back to localStorage", e);
-  }
-
-  // Fallback: localStorage only
-  const local = loadLocal();
-  if (local && local.products) {
-    local.settings = { ...defaultSettings, ...local.settings };
-    if (!local.settings.shiftDefinitions)
-      local.settings.shiftDefinitions = defaultSettings.shiftDefinitions;
-    if (!local.settings.categories)
-      local.settings.categories = defaultSettings.categories;
-    if (!local.settings.theme) local.settings.theme = "graphite-gold";
-    if (!local.users || local.users.length === 0)
-      local.users = createDefaultUsers();
-    saveLocal(local);
-    return local;
-  }
-  const seed = createSeedData();
-  saveLocal(seed);
-  return seed;
+  const firestore = requireSignedIn();
+  const storeRef = doc(firestore, "stores", STORE_ID);
+  const [store, staff] = await Promise.all([
+    getDocFromServer(storeRef),
+    getDocsFromServer(collection(firestore, "staff")),
+  ]);
+  if (!store.exists()) throw new Error("Store document is missing; automatic seeding is disabled");
+  const data = {
+    ...publicStore(store.data()),
+    users: staff.docs.map(userFromStaff),
+  };
+  latestExportData = publicStore(data);
+  return data;
 }
 
-// ─── Save Data ───
-export async function saveData(data) {
-  saveLocal(data);
-  if (isFirebaseReady()) {
-    try {
-      await setDoc(
-        doc(db, "stores", STORE_ID),
-        JSON.parse(JSON.stringify(data)),
-      );
-    } catch (e) {
-      console.warn("Firebase save failed:", e);
-    }
-  }
+// Each action reads the latest store, changes only its own fields, and commits
+// with the incremented revision. A stale edit to the same entity fails visibly.
+export async function saveMutation(operation) {
+  const firestore = requireSignedIn();
+  const ref = doc(firestore, "stores", STORE_ID);
+  const result = await retryRevisionTransaction(() => runTransaction(firestore, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) throw new Error("Store document is missing");
+    const store = publicStore(snap.data());
+    const changes = applyStoreOperation(store, operation);
+    if (!changes) return store;
+    const revision = store.revision + 1;
+    transaction.update(ref, { ...changes, revision });
+    return { ...store, ...changes, revision };
+  }));
+  latestExportData = result;
+  return result;
 }
 
-// ─── Real-time listener (Firebase) ───
-export function subscribeToChanges(callback) {
-  if (!isFirebaseReady()) return () => {};
-  const unsub = onSnapshot(doc(db, "stores", STORE_ID), (snap) => {
-    if (snap.exists()) {
-      const data = snap.data();
-      saveLocal(data);
+export async function saveSale(sale) {
+  const firestore = requireSignedIn();
+  const ref = doc(firestore, "stores", STORE_ID);
+  const result = await retryRevisionTransaction(() => runTransaction(firestore, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) throw new Error("Store document is missing");
+    const store = publicStore(snap.data());
+    const result = applySale(store, sale);
+    if (!result) return store;
+    const revision = store.revision + 1;
+    transaction.update(ref, { ...result, revision });
+    return { ...store, ...result, revision };
+  }));
+  latestExportData = result;
+  return result;
+}
+
+export async function saveRestock(log) {
+  const firestore = requireSignedIn();
+  const ref = doc(firestore, "stores", STORE_ID);
+  const result = await retryRevisionTransaction(() => runTransaction(firestore, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) throw new Error("Store document is missing");
+    const store = publicStore(snap.data());
+    const result = applyRestock(store, log);
+    if (!result) return store;
+    const revision = store.revision + 1;
+    transaction.update(ref, { ...result, revision });
+    return { ...store, ...result, revision };
+  }));
+  latestExportData = result;
+  return result;
+}
+
+export function subscribeToChanges(callback, onError) {
+  const firestore = requireSignedIn();
+  const unsub = onSnapshot(doc(firestore, "stores", STORE_ID), (snap) => {
+    if (snap.exists() && !snap.metadata.fromCache && !snap.metadata.hasPendingWrites) {
+      const data = publicStore(snap.data());
+      latestExportData = data;
       callback(data);
     }
-  });
+  }, onError);
   unsubscribers.push(unsub);
   return unsub;
 }
@@ -187,43 +183,14 @@ export function unsubscribeAll() {
   unsubscribers = [];
 }
 
-// ─── localStorage helpers ───
-export function saveLocal(data) {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(data));
-  } catch (e) {
-    console.warn("localStorage save failed", e);
-  }
-}
-
-function loadLocal() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
 export function clearAllData() {
+  latestExportData = null;
   localStorage.removeItem(LS_KEY);
 }
 
-// ─── Seed ───
-function createSeedData() {
-  return {
-    products: [...seedProducts],
-    transactions: [],
-    restockLogs: [],
-    shifts: [],
-    users: createDefaultUsers(),
-    settings: { ...defaultSettings },
-  };
-}
-
 export function exportData() {
-  const data = loadLocal();
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
+  if (!latestExportData) throw new Error("Load store data before exporting");
+  const blob = new Blob([JSON.stringify(latestExportData, null, 2)], {
     type: "application/json",
   });
   const url = URL.createObjectURL(blob);

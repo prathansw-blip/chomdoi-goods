@@ -6,11 +6,13 @@ import {
   deleteProduct,
   subscribe,
   getSettings,
+  getSyncStatus,
 } from "../data/store.js";
 import {
   generateId,
   formatCurrency,
   showToast,
+  showWriteError,
   getCategoryLabels,
   getCategoryList,
   getStockStatus,
@@ -55,7 +57,7 @@ export function renderStock(container) {
   searchTerm = "";
   draw(container);
   unsub = subscribe(() => {
-    if (!document.querySelector(".modal-overlay")) draw(container);
+    if (!document.querySelector(".modal-overlay") && !getSyncStatus().pending) draw(container);
   });
 }
 
@@ -163,11 +165,18 @@ function showDeleteConfirm(product, container) {
   overlay.onclick = (e) => {
     if (e.target === overlay) overlay.remove();
   };
-  overlay.querySelector("#del-confirm").onclick = () => {
-    deleteProduct(product.id);
-    showToast(`ลบ "${product.name}" แล้ว`, "info");
-    overlay.remove();
-    draw(container);
+  overlay.querySelector("#del-confirm").onclick = async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      await deleteProduct(product.id, product);
+      showToast(`ลบ "${product.name}" แล้ว`, "info");
+      overlay.remove();
+      draw(container);
+    } catch (error) {
+      showWriteError(error);
+      button.disabled = false;
+    }
   };
 }
 
@@ -251,7 +260,7 @@ function showProductModal(container, editId = null) {
   overlay.onclick = (e) => {
     if (e.target === overlay) overlay.remove();
   };
-  overlay.querySelector("#m-save").onclick = () => {
+  overlay.querySelector("#m-save").onclick = async (event) => {
     const name = document.getElementById("m-name").value.trim();
     const price = +document.getElementById("m-price").value;
     if (!name || price <= 0) {
@@ -267,15 +276,22 @@ function showProductModal(container, editId = null) {
       stock: +document.getElementById("m-stock").value || 0,
       lowStockThreshold: +document.getElementById("m-threshold").value || 5,
     };
-    if (existing) {
-      updateProduct(editId, data);
-      showToast("แก้ไขสินค้าแล้ว", "success");
-    } else {
-      addProduct({ id: generateId("prod"), ...data });
-      showToast("เพิ่มสินค้าแล้ว", "success");
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      if (existing) {
+        await updateProduct(editId, data, existing);
+        showToast("แก้ไขสินค้าแล้ว", "success");
+      } else {
+        await addProduct({ id: generateId("prod"), ...data });
+        showToast("เพิ่มสินค้าแล้ว", "success");
+      }
+      overlay.remove();
+      draw(container);
+    } catch (error) {
+      showWriteError(error);
+      button.disabled = false;
     }
-    overlay.remove();
-    draw(container);
   };
 }
 

@@ -6,9 +6,11 @@ import {
   getSettings,
   getActiveShift,
   subscribe,
+  resetStore,
+  getSyncStatus,
 } from "./data/store.js";
 import { formatTime, getCurrentShiftDef, formatHour } from "./utils/utils.js";
-import { getCurrentUser, isAdmin, logout } from "./utils/auth.js";
+import { getCurrentUser, isAdmin, logout, restoreSession } from "./utils/auth.js";
 import { renderLogin } from "./pages/login.js";
 
 import { renderPOS, destroyPOS } from "./pages/pos.js";
@@ -115,8 +117,7 @@ const modalObserver = new MutationObserver(() => {
 });
 modalObserver.observe(document.body, { childList: true, subtree: true });
 
-function boot() {
-  // 1. Instant sync initialization (< 5ms) — renders immediately without blank/loading screen!
+async function boot() {
   initStoreSync();
 
   // Apply saved theme & favicon immediately
@@ -124,22 +125,12 @@ function boot() {
   applyTheme(s.theme || "graphite-gold");
   updateAppFavicon(s.companyLogo);
 
-  const user = getCurrentUser();
-  if (!user) {
-    renderLogin(onLoginSuccess);
-  } else {
-    renderApp();
-  }
-
-  // 2. Connect to Firebase in background to sync fresh data
-  initStore().then(() => {
-    const newSettings = getSettings();
-    applyTheme(newSettings.theme || "graphite-gold");
-    updateAppFavicon(newSettings.companyLogo);
-  });
+  document.getElementById("app").innerHTML =
+    '<div class="login-page"><div class="login-card">กำลังตรวจสอบสิทธิ์...</div></div>';
 
   subscribe(() => {
     const newSettings = getSettings();
+    updateSyncBanner();
     // ถ้ามี modal เปิดอยู่ ไม่ต้อง re-render header เพราะจะทำให้หน้ากระพริบ
     if (!document.querySelector(".modal-overlay")) {
       updateHeader();
@@ -167,12 +158,59 @@ function boot() {
       }
     }
   });
+
+  let user = null;
+  try { user = await restoreSession(); } catch { user = null; }
+  if (user) {
+    try {
+      await initStore();
+      renderApp();
+    } catch {
+      await logout();
+      resetStore();
+      renderLogin(onLoginSuccess);
+    }
+  } else {
+    renderLogin(onLoginSuccess);
+  }
+
+  window.addEventListener("chomdoi-auth-changed", () => {
+    if (!getCurrentUser() && document.getElementById("app-header")) {
+      leaveApp();
+    } else if (document.getElementById("app-header")) {
+      if (!isAdmin() && activeTab === "settings") {
+        renderApp();
+        return;
+      }
+      updateHeader();
+      renderNav();
+    }
+  });
 }
 
+function leaveApp() {
+  allTabs.find((tab) => tab.id === activeTab)?.destroy?.();
+  activeTab = "pos";
+  resetStore();
+  renderLogin(onLoginSuccess);
+}
+
+window.addEventListener("beforeunload", (event) => {
+  if (getSyncStatus().pending) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
+
 async function onLoginSuccess(user) {
-  // Now that we are authenticated, re-initialize the store to get fresh data from Firebase
-  await initStore();
-  renderApp();
+  try {
+    await initStore();
+    renderApp();
+  } catch {
+    await logout();
+    resetStore();
+    renderLogin(onLoginSuccess);
+  }
 }
 
 function getTabs() {
@@ -184,14 +222,36 @@ function renderApp() {
   app.innerHTML = `
     <header class="app-header" id="app-header"></header>
     <nav class="tab-nav" id="tab-nav"></nav>
+    <div id="sync-banner" role="status" aria-live="polite" style="display:none;padding:0.65rem 1rem;text-align:center"></div>
     <main class="page-content fade-in" id="page-content"></main>
   `;
   updateHeader();
+  updateSyncBanner();
   renderNav();
   // If current tab is settings but user is not admin, redirect to pos
   const tabs = getTabs();
   if (!tabs.find((t) => t.id === activeTab)) activeTab = "pos";
   navigateTo(activeTab);
+}
+
+function updateSyncBanner() {
+  const banner = document.getElementById("sync-banner");
+  if (!banner) return;
+  const status = getSyncStatus();
+  if (status.error) {
+    banner.style.display = "block";
+    banner.style.background = "#7f1d1d";
+    banner.style.color = "white";
+    banner.textContent = "บันทึกไม่สำเร็จ การเปลี่ยนแปลงนี้ยังไม่ถูกนำไปใช้ กรุณาโหลดข้อมูลล่าสุดแล้วลองอีกครั้ง";
+  } else if (status.pending) {
+    banner.style.display = "block";
+    banner.style.background = "#78350f";
+    banner.style.color = "white";
+    banner.textContent = "กำลังบันทึกข้อมูล...";
+  } else {
+    banner.style.display = "none";
+    banner.textContent = "";
+  }
 }
 
 function updateHeader() {
@@ -265,12 +325,14 @@ function doLogout() {
   overlay.onclick = (e) => {
     if (e.target === overlay) overlay.remove();
   };
-  overlay.querySelector("#lo-confirm").onclick = () => {
-    logout();
+  overlay.querySelector("#lo-confirm").onclick = async () => {
+    if (getSyncStatus().pending) {
+      overlay.querySelector("p").textContent = "กำลังบันทึกข้อมูล กรุณารอให้เสร็จก่อนออกจากระบบ";
+      return;
+    }
+    await logout();
     overlay.remove();
-    const app = document.getElementById("app");
-    app.innerHTML = "";
-    renderLogin(onLoginSuccess);
+    if (document.getElementById("app-header")) leaveApp();
   };
 }
 

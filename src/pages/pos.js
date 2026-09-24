@@ -8,6 +8,7 @@ import {
   getActiveShift,
   subscribe,
   getSettings,
+  getSyncStatus,
 } from "../data/store.js";
 import { isAdmin } from "../utils/auth.js";
 import {
@@ -16,6 +17,7 @@ import {
   formatTime,
   formatBusinessDate,
   showToast,
+  showWriteError,
   getCategoryLabels,
   getStockStatus,
   getProductIcon,
@@ -39,7 +41,7 @@ export function renderPOS(container) {
   activeFilter = "all";
   draw(container);
   unsub = subscribe(() => {
-    if (!document.querySelector(".modal-overlay")) draw(container);
+    if (!document.querySelector(".modal-overlay") && !getSyncStatus().pending) draw(container);
   });
 
   // เช็ค stock ต่ำทีแรกเดียว (session)
@@ -208,7 +210,7 @@ function draw(container) {
   });
 
   container.querySelectorAll(".btn-del-single-subitem").forEach((btn) => {
-    btn.onclick = (e) => {
+    btn.onclick = async (e) => {
       e.stopPropagation();
       const txnId = btn.dataset.txnid;
       const itemIdx = +btn.dataset.itemidx;
@@ -218,9 +220,16 @@ function draw(container) {
         `ต้องการลบรายการ "${itemName} ×${itemQty}" ออกจากบิลนี้?\n(ระบบจะคืนสินค้าเข้า Stock และหักยอดขายออก)`,
       );
       if (confirmDel) {
-        deleteTransactionItem(txnId, itemIdx);
-        showToast(`ลบ "${itemName}" ออกจากบิลและคืน Stock เรียบร้อย`, "success");
-        draw(container);
+        btn.disabled = true;
+        try {
+          await deleteTransactionItem(txnId, itemIdx,
+            getTransactions().find((txn) => txn.id === txnId));
+          showToast(`ลบ "${itemName}" ออกจากบิลและคืน Stock เรียบร้อย`, "success");
+          draw(container);
+        } catch (error) {
+          showWriteError(error);
+          btn.disabled = false;
+        }
       }
     };
   });
@@ -341,7 +350,7 @@ function showPaymentModal(container) {
   overlay.onclick = (e) => {
     if (e.target === overlay) overlay.remove();
   };
-  overlay.querySelector("#pay-confirm").onclick = () => {
+  overlay.querySelector("#pay-confirm").onclick = async () => {
     let reason = null;
     if (selectedMethod === "free") {
       const sel = freeSelect.value;
@@ -365,13 +374,21 @@ function showPaymentModal(container) {
         reason = sel;
       }
     }
-    confirmSale(container, selectedMethod, reason);
-    overlay.remove();
+    const confirmButton = overlay.querySelector("#pay-confirm");
+    confirmButton.disabled = true;
+    const originalLabel = confirmButton.textContent;
+    confirmButton.textContent = "⏳ กำลังบันทึก...";
+    const saved = await confirmSale(container, selectedMethod, reason);
+    if (saved) overlay.remove();
+    else {
+      confirmButton.disabled = false;
+      confirmButton.textContent = originalLabel;
+    }
   };
 }
 
-function confirmSale(container, paymentMethod = "cash", freeReason = null) {
-  if (cart.length === 0) return;
+async function confirmSale(container, paymentMethod = "cash", freeReason = null) {
+  if (cart.length === 0) return false;
   const shift = getActiveShift();
   const settings = getSettings();
   const startHour = settings.businessDayStartHour || 8;
@@ -391,7 +408,17 @@ function confirmSale(container, paymentMethod = "cash", freeReason = null) {
     shiftId: shift?.id || null,
     businessDate: shift?.businessDate || getBusinessDate(new Date(), startHour),
   };
-  addTransaction(txn);
+  try {
+    await addTransaction(txn);
+  } catch (error) {
+    const message = error.message === "INSUFFICIENT_STOCK"
+      ? "สต็อกไม่พอ กรุณาตรวจจำนวนล่าสุด"
+      : error.message === "SHIFT_NOT_ACTIVE"
+        ? "กะนี้ปิดจากเครื่องอื่นแล้ว กรุณาเปิดกะล่าสุดก่อนขาย"
+        : "ยังบันทึกการขายไม่ได้ กรุณาตรวจการเชื่อมต่อและลองอีกครั้ง";
+    showToast(message, "error");
+    return false;
+  }
   sendSaleNotification(txn);
   checkAndAlertLowStock();
   const labels = { cash: "💵 เงินสด", transfer: "📱 เงินโอน", free: "🎁 ฟรี" };
@@ -401,6 +428,7 @@ function confirmSale(container, paymentMethod = "cash", freeReason = null) {
   );
   cart = [];
   draw(container);
+  return true;
 }
 
 // ═══ Shift Summary Panel ═══
@@ -580,7 +608,7 @@ function showDeleteTxnModal(txnId, container) {
 
     // Bind event for sub-item delete
     overlay.querySelectorAll(".btn-del-subitem").forEach((btn) => {
-      btn.onclick = () => {
+      btn.onclick = async () => {
         const idx = +btn.dataset.idx;
         const itemName = currentTxn.items[idx]?.name || "";
         const itemQty = currentTxn.items[idx]?.qty || 1;
@@ -588,25 +616,37 @@ function showDeleteTxnModal(txnId, container) {
           `ต้องการลบรายการ "${itemName} ×${itemQty}" ออกจากบิลนี้?\n(ระบบจะคืนสินค้าเข้า Stock และหักยอดขายออก)`,
         );
         if (confirmDel) {
-          deleteTransactionItem(txnId, idx);
-          showToast(`ลบ "${itemName}" ออกจากบิลและคืน Stock เรียบร้อย`, "success");
-          renderModalContent();
-          if (container) draw(container);
+          btn.disabled = true;
+          try {
+            await deleteTransactionItem(txnId, idx, currentTxn);
+            showToast(`ลบ "${itemName}" ออกจากบิลและคืน Stock เรียบร้อย`, "success");
+            renderModalContent();
+            if (container) draw(container);
+          } catch (error) {
+            showWriteError(error);
+            btn.disabled = false;
+          }
         }
       };
     });
 
     const wholeBtn = overlay.querySelector("#deltxn-whole");
     if (wholeBtn) {
-      wholeBtn.onclick = () => {
+      wholeBtn.onclick = async () => {
         const confirmDelAll = confirm(
           `ต้องการลบทั้งบิลนี้? (รวม ${formatCurrency(currentTxn.total, currency)})\nสินค้าทุกรายการจะถูกคืนเข้า Stock`,
         );
         if (confirmDelAll) {
-          deleteTransaction(txnId);
-          showToast("ลบรายการขายทั้งบิลและคืนสินค้าเข้า Stock เรียบร้อย", "success");
-          overlay.remove();
-          if (container) draw(container);
+          wholeBtn.disabled = true;
+          try {
+            await deleteTransaction(txnId, currentTxn);
+            showToast("ลบรายการขายทั้งบิลและคืนสินค้าเข้า Stock เรียบร้อย", "success");
+            overlay.remove();
+            if (container) draw(container);
+          } catch (error) {
+            showWriteError(error);
+            wholeBtn.disabled = false;
+          }
         }
       };
     }
