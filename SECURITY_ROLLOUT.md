@@ -13,7 +13,7 @@ Do not run a default `firebase deploy` from this branch. `firebase.json` still r
 5. Review and test every operation-specific transaction before rollout. The candidate writes only changed top-level fields after reading the latest store inside a transaction. Sales, restocks, stock edits, bill cancellation, shifts, settings, and hotel supplies now wait for confirmation before reporting success. A stale edit to the same record fails visibly. Shift deletion also restores stock for its linked sales, which is a deliberate change from the old app.
 6. Run the full application against a synthetic Firestore/Auth Emulator dataset, including login, role changes, simultaneous sales, offline/reconnect, and all settings and stock flows.
 7. Check every device that has used the old app for unsynced local data. Preserve its browser storage before opening or reloading the old app: an online load can replace the local cache with the Firestore document. Reconcile pending sales and stock changes with Firestore before clearing browser storage or switching the app. The new client intentionally does not load the old local cache. Follow `MIGRATION_PREP.md` and use `scripts/audit-legacy-cache.mjs` only with private files outside the repository.
-8. Make a final encrypted, off-device backup and verify that it can be decrypted. Record the latest document update time and Auth user count before cutover.
+8. Make a final encrypted backup on this Mac and verify that it can be decrypted. Record the latest document update time and Auth user count before cutover. The owner chose Mac-only storage and accepts that losing the Mac and its Keychain together can make this backup unusable.
 
 ## Cutover (requires a maintenance window and separate approval)
 
