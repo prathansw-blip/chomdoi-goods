@@ -41,6 +41,7 @@
 - `firestore.rules`: กฎเดิมที่ `firebase.json` ยังอ้างอยู่
 - `firestore.secure.rules`: กฎที่เสนอสำหรับ cutover; `firebase.secure.emulator.json` ใช้ทดสอบเฉพาะ Emulator
 - `scripts/migration-plan.mjs`: ฟังก์ชันสร้างแผนจับคู่ผู้ใช้แบบไม่มี network หรือ filesystem access; ไม่ทำ migration จริง
+- `scripts/audit-legacy-cache.mjs`, `MIGRATION_PREP.md`: เครื่องมือตรวจข้อมูลค้างในเบราว์เซอร์แบบอ่านอย่างเดียวและขั้นเตรียมข้อมูลก่อนย้ายจริง
 - `scripts/seed-emulator.mjs`, `tests/README.md`, `tests/`: ข้อมูลจำลองและวิธีทดสอบ
 - `SECURITY_ROLLOUT.md`: preconditions, cutover และ rollback สำหรับ Production
 
