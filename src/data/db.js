@@ -49,7 +49,11 @@ export function initFirebase(config = FIREBASE_CONFIG) {
     if (typeof window !== "undefined" && !["localhost", "127.0.0.1"].includes(window.location.hostname)) {
       throw new Error("Emulator mode is restricted to localhost");
     }
-    connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    const firestorePort = Number(import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || 8080);
+    if (!Number.isInteger(firestorePort) || firestorePort < 1 || firestorePort > 65535) {
+      throw new Error("Invalid Firestore Emulator port");
+    }
+    connectFirestoreEmulator(db, "127.0.0.1", firestorePort);
     connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
   }
   return db;

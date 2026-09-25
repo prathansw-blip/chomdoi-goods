@@ -64,13 +64,16 @@ export function showToast(message, type = "success", duration = 3000) {
 
 export function showWriteError(error) {
   const message = String(error?.message || "");
+  let visibleMessage;
   if (message.startsWith("SYNC_CONFLICT")) {
-    showToast("ข้อมูลเปลี่ยนจากเครื่องอื่น กรุณาเปิดหน้าล่าสุดแล้วลองอีกครั้ง", "error", 5000);
+    visibleMessage = "ข้อมูลเปลี่ยนจากเครื่องอื่น กรุณาเปิดหน้าล่าสุดแล้วลองอีกครั้ง";
   } else if (error?.code === "permission-denied") {
-    showToast("บัญชีนี้ไม่มีสิทธิ์บันทึกรายการนี้", "error", 5000);
+    visibleMessage = "บัญชีนี้ไม่มีสิทธิ์บันทึกรายการนี้";
   } else {
-    showToast("บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง", "error", 5000);
+    visibleMessage = "บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง";
   }
+  showToast(visibleMessage, "error", 5000);
+  return visibleMessage;
 }
 
 // Category labels — built from settings.categories

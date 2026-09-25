@@ -154,6 +154,7 @@ function showDeleteConfirm(product, container) {
       <div class="modal-title">🗑️ ยืนยันการลบ</div>
       <p style="margin:1rem 0;text-align:center;font-size:1rem">ต้องการลบ <strong>"${product.name}"</strong> ?</p>
       <p style="text-align:center;font-size:0.85rem;color:var(--text-muted)">การลบนี้ไม่สามารถยกเลิกได้</p>
+      <p id="del-error" role="alert" hidden style="color:var(--red);font-size:0.85rem"></p>
       <div class="modal-actions" style="margin-top:1.25rem">
         <button class="btn btn-outline" id="del-cancel">ยกเลิก</button>
         <button class="btn btn-danger" id="del-confirm">🗑️ ลบสินค้า</button>
@@ -171,6 +172,8 @@ function showDeleteConfirm(product, container) {
   };
   overlay.querySelector("#del-confirm").onclick = async (event) => {
     const button = event.currentTarget;
+    const errorNote = overlay.querySelector("#del-error");
+    errorNote.hidden = true;
     button.disabled = true;
     try {
       await deleteProduct(product.id, product);
@@ -178,7 +181,8 @@ function showDeleteConfirm(product, container) {
       overlay.remove();
       draw(container);
     } catch (error) {
-      showWriteError(error);
+      errorNote.textContent = showWriteError(error);
+      errorNote.hidden = false;
       button.disabled = false;
     }
   };
@@ -217,6 +221,7 @@ function showProductModal(container, editId = null) {
         </div>
       </div>
       <div class="form-group"><label class="form-label">จุดเตือน stock ต่ำ</label><input class="form-input" id="m-threshold" type="number" min="0" value="${existing?.lowStockThreshold || 5}"></div>
+      <p id="m-error" role="alert" hidden style="color:var(--red);font-size:0.85rem"></p>
       <div class="modal-actions">
         <button class="btn btn-outline" id="m-cancel">ยกเลิก</button>
         <button class="btn btn-primary" id="m-save">${existing ? "บันทึก" : "เพิ่มสินค้า"}</button>
@@ -285,6 +290,8 @@ function showProductModal(container, editId = null) {
       lowStockThreshold: +document.getElementById("m-threshold").value || 5,
     };
     const button = event.currentTarget;
+    const errorNote = overlay.querySelector("#m-error");
+    errorNote.hidden = true;
     button.disabled = true;
     try {
       if (existing) {
@@ -297,7 +304,8 @@ function showProductModal(container, editId = null) {
       overlay.remove();
       draw(container);
     } catch (error) {
-      showWriteError(error);
+      errorNote.textContent = showWriteError(error);
+      errorNote.hidden = false;
       button.disabled = false;
     }
   };
