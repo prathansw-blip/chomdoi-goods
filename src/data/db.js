@@ -196,7 +196,11 @@ export function exportData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `chomdoi_backup_${new Date().toISOString().slice(0, 10)}.json`;
+  const today = new Date();
+  const localDate = [today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0")].join("-");
+  a.download = `chomdoi_backup_${localDate}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }

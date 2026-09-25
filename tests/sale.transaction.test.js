@@ -99,6 +99,34 @@ async function saveOperation(db, operation) {
 }
 
 describe("sale transaction against secure Firestore rules", () => {
+  it("keeps a failed write out of Firestore, then uses the latest stock after recovery", async () => {
+    const device = env.authenticatedContext("cashier-a").firestore();
+    const otherDevice = env.authenticatedContext("cashier-b").firestore();
+    let unavailable = true;
+    const recoveringDevice = {
+      doc: (path) => device.doc(path),
+      runTransaction: (action) => unavailable
+        ? Promise.reject(Object.assign(new Error("network unavailable"), { code: "unavailable" }))
+        : device.runTransaction(action),
+    };
+    await expect(saveSale(recoveringDevice, sale("failed-sale"))).rejects.toMatchObject({
+      code: "unavailable",
+    });
+    await saveSale(otherDevice, sale("remote-sale"));
+    unavailable = false;
+
+    const afterRecovery = (await device.doc(STORE_PATH).get({ source: "server" })).data();
+    expect(afterRecovery.transactions.map((entry) => entry.id)).toEqual(["remote-sale"]);
+    expect(afterRecovery.products[0].stock).toBe(9);
+
+    await saveSale(recoveringDevice, sale("after-recovery"));
+    const finalStore = (await device.doc(STORE_PATH).get({ source: "server" })).data();
+    expect(finalStore.transactions.map((entry) => entry.id)).toEqual([
+      "remote-sale", "after-recovery",
+    ]);
+    expect(finalStore.products[0].stock).toBe(8);
+  });
+
   it("keeps both sales and deducts stock twice when two devices sell together", async () => {
     const a = env.authenticatedContext("cashier-a").firestore();
     const b = env.authenticatedContext("cashier-b").firestore();

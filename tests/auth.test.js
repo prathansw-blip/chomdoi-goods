@@ -2,6 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 function setupAuth({ active = true, hasStaff = true, validPassword = true } = {}) {
   let signedInUser = null;
+  let staffListener = null;
+  let staffRecord = {
+    uid: "auth-uid", legacyId: "legacy-user", username: "cashier",
+    displayName: "Cashier", role: "user", active,
+  };
   const auth = { get currentUser() { return signedInUser; } };
   const signInWithEmailAndPassword = vi.fn(async (_auth, email, password) => {
     if (!validPassword) throw new Error("invalid credential");
@@ -21,12 +26,12 @@ function setupAuth({ active = true, hasStaff = true, validPassword = true } = {}
     doc: (_db, _collection, uid) => ({ uid }),
     getDocFromServer: vi.fn(async () => ({
       exists: () => hasStaff,
-      data: () => ({
-        uid: "auth-uid", legacyId: "legacy-user", username: "cashier",
-        displayName: "Cashier", role: "user", active,
-      }),
+      data: () => staffRecord,
     })),
-    onSnapshot: () => () => {},
+    onSnapshot: (_ref, onNext) => {
+      staffListener = onNext;
+      return () => { staffListener = null; };
+    },
   }));
   vi.doMock("../src/data/db.js", () => ({
     FIREBASE_CONFIG: { projectId: "demo-only" },
@@ -34,7 +39,13 @@ function setupAuth({ active = true, hasStaff = true, validPassword = true } = {}
     getDb: () => ({}),
     getFirebaseAuth: () => auth,
   }));
-  return { signInWithEmailAndPassword, signOut };
+  return {
+    signInWithEmailAndPassword, signOut,
+    changeStaff: (updates) => {
+      staffRecord = { ...staffRecord, ...updates };
+      staffListener?.({ exists: () => true, data: () => staffRecord });
+    },
+  };
 }
 
 afterEach(() => {
@@ -77,5 +88,20 @@ describe("Firebase Auth plus staff membership", () => {
     expect(await auth.login("cashier", "wrong")).toBeNull();
     expect(firebase.signInWithEmailAndPassword).toHaveBeenCalledOnce();
     expect(auth.getCurrentUser()).toBeNull();
+  });
+
+  it("updates a role immediately and signs out when staff is deactivated", async () => {
+    const firebase = setupAuth();
+    const auth = await import("../src/utils/auth.js");
+    await auth.login("cashier", "test-only");
+
+    firebase.changeStaff({ role: "admin" });
+    expect(auth.getCurrentUser()?.role).toBe("admin");
+    firebase.changeStaff({ role: "user" });
+    expect(auth.getCurrentUser()?.role).toBe("user");
+
+    firebase.changeStaff({ active: false });
+    expect(auth.getCurrentUser()).toBeNull();
+    expect(firebase.signOut).toHaveBeenCalledOnce();
   });
 });

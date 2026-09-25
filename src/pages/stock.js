@@ -161,9 +161,13 @@ function showDeleteConfirm(product, container) {
     </div>
   `;
   document.body.appendChild(overlay);
-  overlay.querySelector("#del-cancel").onclick = () => overlay.remove();
+  const closeOverlay = () => {
+    overlay.remove();
+    draw(container);
+  };
+  overlay.querySelector("#del-cancel").onclick = closeOverlay;
   overlay.onclick = (e) => {
-    if (e.target === overlay) overlay.remove();
+    if (e.target === overlay) closeOverlay();
   };
   overlay.querySelector("#del-confirm").onclick = async (event) => {
     const button = event.currentTarget;
@@ -220,6 +224,10 @@ function showProductModal(container, editId = null) {
     </div>
   `;
   document.body.appendChild(overlay);
+  const closeOverlay = () => {
+    overlay.remove();
+    draw(container);
+  };
 
   // Photo upload — with auto-compression
   let pendingPhoto = existing?.photo || null;
@@ -256,9 +264,9 @@ function showProductModal(container, editId = null) {
         '<span style="color:var(--text-muted);font-size:0.75rem">ไม่มีรูป</span>';
     };
 
-  overlay.querySelector("#m-cancel").onclick = () => overlay.remove();
+  overlay.querySelector("#m-cancel").onclick = closeOverlay;
   overlay.onclick = (e) => {
-    if (e.target === overlay) overlay.remove();
+    if (e.target === overlay) closeOverlay();
   };
   overlay.querySelector("#m-save").onclick = async (event) => {
     const name = document.getElementById("m-name").value.trim();

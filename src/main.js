@@ -178,7 +178,8 @@ async function boot() {
     if (!getCurrentUser() && document.getElementById("app-header")) {
       leaveApp();
     } else if (document.getElementById("app-header")) {
-      if (!isAdmin() && activeTab === "settings") {
+      if (!isAdmin() && allTabs.find((tab) => tab.id === activeTab)?.adminOnly) {
+        document.querySelectorAll(".modal-overlay").forEach((overlay) => overlay.remove());
         renderApp();
         return;
       }
@@ -227,11 +228,8 @@ function renderApp() {
   `;
   updateHeader();
   updateSyncBanner();
-  renderNav();
-  // If current tab is settings but user is not admin, redirect to pos
   const tabs = getTabs();
-  if (!tabs.find((t) => t.id === activeTab)) activeTab = "pos";
-  navigateTo(activeTab);
+  navigateTo(tabs.find((tab) => tab.id === activeTab) ? activeTab : "pos");
 }
 
 function updateSyncBanner() {
@@ -365,6 +363,7 @@ function renderNav() {
 }
 
 function navigateTo(tabId) {
+  if (!getTabs().some((tab) => tab.id === tabId)) tabId = "pos";
   const current = allTabs.find((t) => t.id === activeTab);
   if (current?.destroy) current.destroy();
   activeTab = tabId;
