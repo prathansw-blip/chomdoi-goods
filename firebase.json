@@ -53,7 +53,7 @@
     ]
   },
   "firestore": {
-    "rules": "firestore.rules",
+    "rules": "firestore.secure.rules",
     "indexes": "firestore.indexes.json"
   }
 }

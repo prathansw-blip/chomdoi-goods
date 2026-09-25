@@ -2,7 +2,7 @@
 
 This is a deployment checklist for the proposed `firestore.secure.rules`. It is **not** safe to deploy that file alone. The currently deployed web app still logs in against `stores/chomdoi_main.users`, writes that whole document, and reads the LINE token from it.
 
-Do not run a default `firebase deploy` from this branch. `firebase.json` still references the old public `firestore.rules`, while the candidate client requires Firebase Auth and `/staff/{uid}` records. Publishing the client or rules before the cutover steps can interrupt staff access or leave the store publicly accessible.
+Do not run a default `firebase deploy` before cutover. `firebase.json` now references `firestore.secure.rules`, but the candidate client still requires the store migration. Publishing the client or rules before auditing every used device, taking a final backup, and migrating the store can interrupt staff access. The old public `firestore.rules` remains only for legacy tests and reference.
 
 ## Preconditions
 
@@ -15,12 +15,12 @@ Do not run a default `firebase deploy` from this branch. `firebase.json` still r
 7. Check every device that has used the old app for unsynced local data. Preserve its browser storage before opening or reloading the old app: an online load can replace the local cache with the Firestore document. Reconcile pending sales and stock changes with Firestore before clearing browser storage or switching the app. The new client intentionally does not load the old local cache. Follow `MIGRATION_PREP.md` and use `scripts/audit-legacy-cache.mjs` only with private files outside the repository.
 8. Make a final encrypted backup on this Mac and verify that it can be decrypted. Record the latest document update time and Auth user count before cutover. The owner chose Mac-only storage and accepts that losing the Mac and its Keychain together can make this backup unusable.
 
-## Cutover (requires a maintenance window and separate approval)
+## Cutover (requires a maintenance window and completed device audit)
 
 1. Stop staff transactions and make the final backup.
-2. Publish temporary deny-all Firestore rules so the old public document cannot be read during migration.
+2. Publish `firestore.maintenance.rules` through `firebase.maintenance.json` so the old public document cannot be read or written during migration. Check the published source before the store write.
 3. With administrator credentials, verify the five pre-created staff documents against the owner-approved roster, then remove `users` from the store document. Keep `settings.line` intact, including its token and enabled state. Do not copy plaintext passwords into new documents.
-4. Publish the new web app and `firestore.secure.rules` together. Verify unauthenticated and unapproved accounts are denied; approved staff can sign in; admins and cashiers see the correct pages; two simultaneous test sales both persist and stock reflects both.
+4. Publish the new web app and `firestore.secure.rules` using the branch's `firebase.json`. Verify the published Hosting release and Rules source; unauthenticated and unapproved accounts are denied; approved staff can sign in through the webapp; admins and cashiers see the correct pages; two simultaneous test sales both persist and stock reflects both.
 5. Reopen transactions only after the checks pass. Monitor write failures and Auth denials.
 
 ## Rollback principle
@@ -30,6 +30,8 @@ If a cutover check fails, stop transactions and keep the database locked while r
 ## Current evidence
 
 - The owner approved five staff roles. Five `/staff/{uid}` records were created atomically in Production and verified by reading them back; six unmatched Auth accounts have no staff record. The store document, Auth accounts, deployed Rules and Hosting were not changed. A post-write encrypted backup including staff was verified on this Mac.
+- A sanitized copy of that encrypted backup was restored to a localhost-only Firestore Emulator: 14 products, 1,140 transactions, and five staff records matched. The exact masked write used for store cutover removed `users`, added `revision: 0`, and preserved other fields under an update-time precondition. A local run under secure rules denied an unauthenticated restore request, as expected; the successful drill used a separate local-only open-rules configuration. No Production store write was made.
+- The owner confirmed that additional devices have used the old app. Their browser caches must be audited before cutover.
 - `tests/firestore.rules.test.js` reproduces unauthenticated access and a lost sale under the current rules.
 - `tests/firestore.secure.rules.test.js` checks the proposed staff gate and rejects a stale revision.
 - `tests/sale.transaction.test.js` verifies two simultaneous sales, sale/restock/cancellation concurrency, stale stock rejection, shift-close protection, settings merge, daily-check conflict, and recovery after an injected `unavailable` write failure using synthetic data. The failure injection is not a real network outage.
