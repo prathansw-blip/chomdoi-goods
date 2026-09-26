@@ -1,10 +1,12 @@
 // login.js — Login Page
+import defaultCompanyLogo from "../assets/chomdoi-house-logo.png";
 import { getSettings } from "../data/store.js";
 import { login } from "../utils/auth.js";
 
 export function renderLogin(onSuccess) {
   const app = document.getElementById("app");
   const s = getSettings();
+  const logoUrl = s.companyLogo || defaultCompanyLogo;
 
   app.innerHTML = `
     <div class="login-page">
@@ -15,11 +17,7 @@ export function renderLogin(onSuccess) {
       </div>
       <div class="login-card">
         <div class="login-logo">
-          ${
-            s.companyLogo
-              ? `<img src="${s.companyLogo}" alt="logo" class="login-logo-img">`
-              : `<div class="login-logo-placeholder">🏨</div>`
-          }
+          <img src="${logoUrl}" alt="Chomdoi House" class="login-logo-img">
         </div>
         <h1 class="login-title">${s.companyName || "Chomdoi Goods"}</h1>
         <p class="login-subtitle">Hotel Counter POS</p>
