@@ -1,6 +1,6 @@
 # Security rollout (deployed; owner confirmed admin webapp access)
 
-Firebase Hosting and `firestore.secure.rules` were deployed on 26 September 2026 at approximately 10:43 Bangkok time from `codex/secure-sync-prep`, application commit `22370b5`. Production is `https://chomdoi-house.web.app`. The deployed client uses Firebase Auth, active staff records and operation-specific transactions; the store no longer contains `users`. The release history was subsequently integrated into `main` by fast-forward. UI/data-handling source and secure Rules match the deployed commit; later commits update documentation, Git housekeeping and build/Node dependencies. The dependency patch described below has not been deployed.
+Firebase Hosting and `firestore.secure.rules` were deployed on 26 September 2026 at approximately 10:43 Bangkok time from `codex/secure-sync-prep`, application commit `22370b5`. Production is `https://chomdoi-house.web.app`. The deployed client uses Firebase Auth, active staff records and operation-specific transactions; the store no longer contains `users`. The release history was subsequently integrated into `main` by fast-forward. The dependency patch from application commit `13c9112` was deployed to Hosting only on the same day at 15:00:17 Bangkok time. UI/data-handling source, the data model and secure Rules are unchanged from the cutover commit; the later patch updates build/Node dependencies without a database migration.
 
 The owner confirmed normal admin access through the deployed webapp on 26 September 2026 at approximately 11:04 Bangkok time. The earlier failed attempt has no confirmed root cause; do not label it a password mismatch or Rules propagation issue. The last observed private diagnostic status had no check result or repair, no password-repair record was found, and its process and browser tab are closed. Codex did not reset a password or deploy a login fix during this investigation. Have each device close old tabs, open the current URL, sign in and check current sales/stock before resuming transactions. Keep Chrome data for the unresolved device reconciliation below. The old public `firestore.rules` remains only for legacy tests and reference.
 
@@ -61,7 +61,7 @@ A read-only build with output writing disabled inspected 41 bundled module IDs; 
 
 No package versions, deployed assets, credentials or Production data were changed during that initial integration check. The subsequent fix and verification follow.
 
-## Dependency security patch (26 September 2026; verified, not deployed)
+## Dependency security patch (26 September 2026; verified and deployed to Hosting only)
 
 Started from baseline `6b7d463` on `codex/dependency-security`. Only the dependency manifests and documentation changed; no UI source, input fields, data model, Firestore Rules or Firebase project configuration changed. Firebase `12.12.1`, Chart.js `4.5.1` and the Firebase app/auth/firestore runtime SDK versions stayed unchanged. Vite was pinned to the patched `8.0.16` release; targeted lockfile updates resolved the Node transport vulnerabilities and supporting tooling packages without a forced major upgrade or overrides.
 
@@ -83,7 +83,17 @@ Verification:
 - UI checks used only the localhost Auth/Firestore Emulators with `demo-chomdoi-tests`: admin and cashier sign-in, expected role menus, opening a shift, recording one sale, preserving Thai text and emoji from the form exactly when read back, restocking three units with a Thai note, and a second browser tab receiving sale/stock changes without reload. Starting stock 20 became 19 after sale and 22 after restock. These were synthetic records, with LINE disabled. No Production credentials or store contents were used.
 - The initial anonymous read of the secure Emulator was denied; the input-preservation read then used the synthetic admin's Firebase token and passed. The test tabs and Emulators were shut down after verification. Screenshot evidence: `/Users/keng/.codex/backups/chomdoi-house/dependency-security-2026-09-26-ui.png`.
 
-Production still runs commit `22370b5`. This patch did not read/write Production Firestore, change Auth credentials, send LINE messages or deploy Hosting/Rules. To roll back the dependency change before deployment, revert the patch's manifest/lockfile changes in Git and run `npm ci`; keep the secure client and secure Rules. Do not restore a store snapshot. Any later adoption should use a Hosting-only deployment of the reviewed build; no database migration is required by this patch.
+The preparation and test phase did not read/write Production Firestore, change Auth credentials, send LINE messages or deploy Hosting/Rules. The owner subsequently authorized deployment. A fresh production build passed with the same reviewed JS/CSS filenames; the existing chunk-size warning remains. The pre-deploy public HTML and referenced JS/CSS hashes matched the recorded cutover build, and public files plus the candidate build were saved on the Mac. The retained Firebase Hosting release history is the rollback source; the local public snapshot is not a complete inventory of the prior Hosting version.
+
+Deployment command (Hosting only; no Rules, Auth, or data migration):
+
+```sh
+rtk proxy firebase deploy --only hosting --project chomdoi-house --config firebase.json --non-interactive --message "Dependency security patch 13c9112"
+```
+
+The command completed successfully. Live release `1790409617241000`, version `485992fc0f17872a`, was finalized and published at `2026-09-26T08:00:17.241Z` (15:00:17 Bangkok). Production now serves the build from `13c9112`. Unauthenticated public HTTP requests verified SHA256 equality for all five build files (`index.html`, `favicon.svg`, `icons.svg`, JS and CSS), correct HTML/JS/CSS headers and SPA rewrite behavior. Verification did not execute an authenticated browser or contact Firestore/Auth; business transactions were tested only in the Emulator before deployment. No Production business record, credential, LINE setting or Rules was read or changed during this Hosting rollout.
+
+Evidence and public asset snapshots: `/Users/keng/.codex/backups/chomdoi-house/dependency-hosting-2026-09-26T08-00-01.390Z/`, including `manifest.json`, `deployment-verification.json`, `hosting-after.json` and `ROLLBACK.md`. If this release fails, use Firebase Console > Hosting > live release history to roll back Hosting to version `1b36ddb7160f2d62`, release `1790394167196000` (the pre-patch application build), then verify against the manifest. Keep the secure client and secure Rules; do not restore a store snapshot or deploy legacy Rules. A source-level rollback can revert the manifest/lockfile changes in Git and run `npm ci`, followed by a reviewed Hosting-only release. No database restore is needed for this dependency patch.
 
 ## Preparation and Emulator evidence (before deployment)
 
