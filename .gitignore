@@ -29,6 +29,8 @@ dist-ssr
 chomdoi_main_backup.json
 
 # Local debug & test scripts
+/.firebase/
+/.serena/
 inspect*.js
 simulate*.js
 test*.js

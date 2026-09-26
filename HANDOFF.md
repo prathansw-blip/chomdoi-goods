@@ -1,25 +1,25 @@
 # Chomdoi Goods — คู่มือรับช่วงงาน
 
-อัปเดต: 26 กันยายน 2026 หลังย้ายข้อมูลและ deploy จริง ระบบ Production ใช้โค้ดจาก `codex/secure-sync-prep` commit `22370b5` แล้ว ส่วน `main` ยังเป็นโค้ดเดิม อย่า deploy จาก `main` โดยไม่ตรวจสถานะ branch
+อัปเดต: 26 กันยายน 2026 หลังย้ายข้อมูลและ deploy จริง ระบบ Production ใช้ application commit `22370b5` เจ้าของยืนยันว่า admin เข้าได้และสต็อกตรงกันทุกเครื่องแล้ว รวมประวัติ `codex/secure-sync-prep` เข้า `main` แบบ fast-forward เพื่อใช้เป็นจุดเริ่มพัฒนาต่อ โค้ดแอปและ secure Rules ตรงกับรุ่นที่ deploy; งานหลัง `22370b5` เป็นเอกสารและการจัดการไฟล์ใน Git
 
 ## เริ่มจากตรงไหน
 
 | รายการ | สถานะ |
 | --- | --- |
 | Repository | `https://github.com/prathansw-blip/chomdoi-goods` |
-| `main` / `origin/main` | commit `3a5a816`; โค้ดเดิมสำหรับอ้างอิง ไม่ใช่รุ่นที่ Production ใช้หลัง cutover |
-| `codex/secure-sync-prep` | รุ่น Production ที่ deploy จาก commit `22370b5`; มี Firebase Auth, transaction สำหรับหลายเครื่อง, กฎ staff และ Emulator tests; ตรวจ `git log -1` สำหรับงานเอกสารหลัง deploy |
+| `main` / `origin/main` | รวมรุ่นที่ใช้งานจริงจาก `codex/secure-sync-prep` แล้ว; ตรวจ `git log -1` สำหรับ commit เอกสารล่าสุด; application commit ที่ deploy คือ `22370b5` |
+| `codex/secure-sync-prep` | เก็บประวัติงาน cutover; มี Firebase Auth, transaction สำหรับหลายเครื่อง, กฎ staff และ Emulator tests |
 | Checkout หลักบนเครื่องนี้ | `/Users/keng/Documents/AI Project/Chomdoi Goods - Codex` อยู่บน `main` |
 | Worktree รุ่นที่ deploy แล้ว | `/Users/keng/.codex/worktrees/chomdoi-emulator-tests/Chomdoi Goods - Codex` อยู่บน `codex/secure-sync-prep` |
-| สถานะ release | Deploy Firebase Hosting และ secure Rules แล้วเมื่อ 26 กันยายน 2026 เวลา 10:43 น. ไทย; เจ้าของยืนยันว่า admin เข้าเว็บได้ปกติแล้วเวลา 11:04 น. ไทย; ยังไม่ merge เข้า `main`; ให้ทุกเครื่องโหลดเว็บรุ่นใหม่ก่อนใช้งาน |
+| สถานะ release | Deploy Firebase Hosting และ secure Rules แล้วเมื่อ 26 กันยายน 2026 เวลา 10:43 น. ไทย; เจ้าของยืนยัน admin เข้าได้เวลา 11:04 น. และตรวจทุกเครื่องแล้วสต็อกตรงกัน; รวมเข้า `main` แล้วโดยไม่ deploy เพิ่ม |
 
-เริ่มงานพัฒนาต่อใน worktree ของ `codex/secure-sync-prep` ข้างต้น หรือ clone branch นี้ใหม่ ตรวจ branch ด้วย `git status -sb` ก่อนแก้ไฟล์ หากเปิด checkout หลักบน `main` จะเห็นโค้ดและคำสั่งทดสอบรุ่นเก่า
+เริ่มงานพัฒนาต่อจาก `main` ที่ checkout หลักข้างต้น หรือสร้าง branch `codex/<ชื่องาน>` จาก `main` สำหรับงานใหม่ ตรวจ branch ด้วย `git status -sb` ก่อนแก้ไฟล์ เอกสาร HANDOFF รุ่นก่อน cutover ที่เคยค้างใน checkout หลักเก็บไว้ใน Git stash ชื่อ `Preserve pre-cutover local handoff before main fast-forward` และตรงกับเอกสารที่มีอยู่ในประวัติ Git แล้ว ไฟล์ cache ของ Firebase CLI และ `.serena/` เป็นข้อมูลเฉพาะเครื่องและถูก ignore
 
 ระบบเป็น Vite SPA สำหรับ POS, สต็อก, การเติมสินค้า, กะ, ของใช้โรงแรม และตั้งค่า Production อยู่บน Firebase Hosting ของโปรเจกต์ `chomdoi-house` ที่ `https://chomdoi-house.web.app` หลัง deploy ตรวจ HTML และไฟล์ JS/CSS ของ URL จริงว่าตรงกับ build ทุก byte พร้อมตรวจ Rules source ผ่าน Firebase API ว่าตรงกับ `firestore.secure.rules` กฎที่เผยแพร่คือ ruleset `0725e012-e807-4a19-9e7a-6fac61c41aa9`
 
 ## สองรุ่นทำงานต่างกันอย่างไร
 
-| เรื่อง | `main` / ระบบเดิมก่อน cutover | `codex/secure-sync-prep` / Production ปัจจุบัน |
+| เรื่อง | ระบบเดิมที่ commit `3a5a816` | `main` / Production ปัจจุบัน |
 | --- | --- | --- |
 | Login | พนักงานกรอก username/password ใน webapp; เว็บตรวจกับ `users` ใน `/stores/chomdoi_main`; Firestore Rules เดิมไม่บังคับ login | พนักงานยังกรอก username/password ในหน้า webapp Chomdoi Goods; Firebase Auth ตรวจรหัสผ่านเบื้องหลัง และต้องมี `/staff/{uid}` ที่ active; พนักงานไม่เข้า Firebase Console และเว็บไม่สร้างบัญชีขณะ login |
 | ผู้ใช้ | ยังอยู่ใน array `users` ของเอกสารร้าน รวมข้อมูลรหัสผ่านเดิม | ใช้ Firebase Auth เดิมและ `/staff/{uid}` 5 รายการแล้ว; ลบ `users` ออกจากเอกสารร้านแล้ว การจัดการบัญชีต้องทำผ่านผู้ดูแลที่เชื่อถือได้ ไม่ได้ทำในหน้า Settings |
@@ -50,7 +50,7 @@
 
 `src/data/db.js` ใช้ Firebase config ของ `demo-chomdoi-tests` เฉพาะ Vite mode `emulator`; mode ปกติชี้ไปที่ `chomdoi-house` จึงใช้ `npm run dev:emulator` เมื่อต้องการลองเว็บโดยไม่เชื่อม Production อย่าใช้ `npm run dev` สำหรับการทดสอบที่ตั้งใจให้ปลอดจากข้อมูลจริง การทดสอบตัดการเชื่อมต่อเฉพาะเครื่องลูกข่ายสามารถกำหนด `VITE_FIRESTORE_EMULATOR_PORT` ให้ชี้พอร์ต proxy บน `127.0.0.1` แทนพอร์ต Emulator ปกติ `8080`
 
-## คำสั่งทำงานใน branch รุ่นถัดไป
+## คำสั่งพัฒนาต่อจากรุ่นปัจจุบัน
 
 ต้องมี Node.js, Firebase CLI และ JDK 21 ขึ้นไป ใช้ `npm ci` ติดตั้งตาม lockfile บนเครื่องนี้ JDK 21 อยู่ที่ `/opt/homebrew/opt/openjdk@21/bin` คำสั่ง shell ของ Codex ใน workspace นี้ขึ้นต้นด้วย `rtk` ตาม `/Users/keng/.codex/RTK.md`
 
@@ -73,8 +73,8 @@ rtk proxy env PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH npm run dev:emulator
 - **เจ้าของยืนยันว่า `admin` เข้า webapp ได้ปกติแล้ว** เมื่อ 26 กันยายน 2026 เวลา 11:04 น. ไทย หลังเคยรายงานว่าเข้าไม่ได้ ยังไม่มีหลักฐานยืนยันสาเหตุของความล้มเหลวครั้งแรก จึงไม่สรุปว่ารหัสผิดหรือเกิดจากการเผยแพร่ Rules หน้าตรวจส่วนตัวไม่ได้ส่งผลตรวจหรือสร้างบันทึกเปลี่ยนรหัส และ process ปิดแล้ว; Codex ไม่ได้รีเซ็ตรหัสผ่านหรือ deploy โค้ดแก้ login ในช่วงนี้ ไม่มีรายการขายจำลองหรือการแก้สต็อกถูกเขียนลง Production ระหว่าง smoke test; การทดสอบธุรกรรมพร้อมกันใช้ Emulator
 - สำรองก่อนย้ายที่ `/Users/keng/.codex/backups/chomdoi-house/2026-09-26T03-41-30-259Z-e410f9/` และหลังย้ายที่ `/Users/keng/.codex/backups/chomdoi-house/2026-09-26T03-43-14-974Z-dab1f4/` เข้ารหัสและตรวจถอดรหัสครบ Firestore, staff 5 รายการ, Auth 11 บัญชี, hash config และ Rules กุญแจอยู่ใน Mac Keychain ซ้อมกู้คืนสำเนาวันที่ 25 กันยายนแบบตัดข้อมูลลับใน Emulator ผ่านแล้ว แต่ยังไม่ได้ซ้อมนำเข้า Auth hash
 - Windows PC 1 เครื่องและ Android Chrome 1 เครื่องยังไม่ได้ตรวจ cache ตามคำสั่งเจ้าของระบบที่ให้ข้ามก่อน deploy เว็บใหม่เก็บสำเนารายการเดิมแบบตัดข้อมูลลับก่อนเริ่มแอป แต่ยังไม่ยืนยันสำเนาบนอุปกรณ์จริง ข้อมูลเก่าเฉพาะเครื่องจะไม่ซิงก์อัตโนมัติ และห้ามนำ export เก่าทั้งเอกสารทับฐานกลาง
-- admin ผ่านตามการยืนยันของเจ้าของแล้ว ให้ทุกเครื่องปิดแท็บเว็บเก่าแล้วเปิด URL เดิมเพื่อใช้รุ่นใหม่และล็อกอิน ตรวจยอดขาย/สต็อกก่อนเริ่มทำรายการ **อย่าล้าง Chrome data** จนกว่าจะกระทบยอดข้อมูลเก่า การเปิดแท็บเก่าค้างไว้ไม่ทำให้ได้โค้ดใหม่ และ client เดิมจะถูกกฎใหม่ปฏิเสธการเขียน
-- พัฒนาต่อจาก branch ที่ deploy แล้ว ทดสอบด้วย Emulator และสำรองก่อนแก้ Production อ่านวิธีกู้คืนที่ `SECURITY_ROLLOUT.md` อย่าเผยแพร่ `firestore.rules` แบบเดิมกลับไป
+- **เจ้าของตรวจทุกเครื่องแล้วและยืนยันว่าสต็อกตรงกัน** เมื่อ 26 กันยายน 2026 ผลนี้ยืนยันสต็อกที่แสดงในเว็บตามการตรวจของเจ้าของ ยังไม่ใช่การกระทบยอดประวัติขายหรือ cache เก่า Windows/Android จึงเก็บ Chrome data ต่อไว้สำหรับตรวจรายการเฉพาะเครื่องหากพบภายหลัง การตรวจสต็อกไม่ได้เพิ่มหรือแก้ข้อมูล Production โดย Codex
+- ใช้รุ่นใหม่และพัฒนาต่อจาก `main` ได้แล้ว ทดสอบด้วย Emulator และสำรองก่อนแก้ Production อ่านวิธีกู้คืนที่ `SECURITY_ROLLOUT.md` อย่าเผยแพร่ `firestore.rules` แบบเดิมกลับไป
 
 ## ข้อกำหนดที่ยืนยันจากเจ้าของระบบ
 
