@@ -43,6 +43,24 @@ Before clearing a valid legacy cache, the candidate now preserves its business r
 
 If a cutover check fails, keep staff transactions stopped and repair the confirmed cause. Secure rules are currently deployed; maintenance deny-all rules are not currently active. If the failure requires another store migration or exposes data, deploy and verify maintenance rules before that work. Do not restore the old public rules or old browser password flow. Restore the backed-up store only after reconciling transactions created since the backup; a blind whole-document restore would erase newer sales. The encrypted backup and detailed recovery notes are stored outside the repository under `/Users/keng/.codex/backups/chomdoi-house/`, including `ROLLBACK-v2.md`.
 
+## Dependency follow-up found during main integration (26 September 2026)
+
+`npm ci` and `npm run build` passed in the primary `main` checkout. Built JS/CSS SHA256 values match the verified deployed assets. `npm audit` reports seven vulnerable packages from the unchanged lockfile:
+
+| Package | Installed | Audit severity | Dependency path |
+| --- | --- | --- | --- |
+| `@grpc/grpc-js` | `1.9.15` | high | Firebase Firestore Node transport |
+| `@protobufjs/utf8` | `1.1.0` | moderate | protobufjs / gRPC Node transport |
+| `protobufjs` | `7.5.5` | high | Firestore Node transport |
+| `websocket-driver` | `0.7.4` | critical | Firebase Realtime Database Node dependency; this app uses Firestore |
+| `vite` | `8.0.10` | high | development/build tooling |
+| `postcss` | `8.5.12` | high | development/build tooling |
+| `nanoid` | `3.3.11` | high | PostCSS tooling dependency |
+
+A read-only build with output writing disabled inspected 41 bundled module IDs; none of these seven packages appeared in the emitted browser JavaScript module list. This narrows their observed exposure in the current browser build; it does not make the installed Node/development dependencies safe or constitute a complete security audit. The maintainer advisories include [websocket-driver protocol handling](https://github.com/faye/websocket-driver-node/security/advisories/GHSA-xv26-6w52-cph6) and [Vite Windows development server path handling](https://github.com/vitejs/vite/security/advisories/GHSA-fx2h-pf6j-xcff).
+
+Next maintenance work: update affected dependencies on a separate `codex/` branch, inspect the lockfile diff, rerun the relevant Emulator/UI checks and production build, and recheck `npm audit` before adoption. Do not run an unreviewed forced major update. No package versions, deployed assets, credentials or Production data were changed during this integration check. Source rollback uses Git; it must not restore an old public Rules file or an old store snapshot.
+
 ## Preparation and Emulator evidence (before deployment)
 
 - The owner approved five staff roles. Five `/staff/{uid}` records were created atomically in Production and verified by reading them back; six unmatched Auth accounts have no staff record. The store document, Auth accounts, deployed Rules and Hosting were not changed. A post-write encrypted backup including staff was verified on this Mac.
