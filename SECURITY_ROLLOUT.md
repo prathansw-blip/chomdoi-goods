@@ -1,6 +1,6 @@
 # Security rollout (deployed; owner confirmed admin webapp access)
 
-Firebase Hosting and `firestore.secure.rules` were deployed on 26 September 2026 at approximately 10:43 Bangkok time from `codex/secure-sync-prep`, application commit `22370b5`. Production is `https://chomdoi-house.web.app`. The deployed client uses Firebase Auth, active staff records and operation-specific transactions; the store no longer contains `users`. The release history was subsequently integrated into `main` by fast-forward. Application code and secure Rules match the deployed commit; later commits update documentation and Git housekeeping without another deployment.
+Firebase Hosting and `firestore.secure.rules` were deployed on 26 September 2026 at approximately 10:43 Bangkok time from `codex/secure-sync-prep`, application commit `22370b5`. Production is `https://chomdoi-house.web.app`. The deployed client uses Firebase Auth, active staff records and operation-specific transactions; the store no longer contains `users`. The release history was subsequently integrated into `main` by fast-forward. UI/data-handling source and secure Rules match the deployed commit; later commits update documentation, Git housekeeping and build/Node dependencies. The dependency patch described below has not been deployed.
 
 The owner confirmed normal admin access through the deployed webapp on 26 September 2026 at approximately 11:04 Bangkok time. The earlier failed attempt has no confirmed root cause; do not label it a password mismatch or Rules propagation issue. The last observed private diagnostic status had no check result or repair, no password-repair record was found, and its process and browser tab are closed. Codex did not reset a password or deploy a login fix during this investigation. Have each device close old tabs, open the current URL, sign in and check current sales/stock before resuming transactions. Keep Chrome data for the unresolved device reconciliation below. The old public `firestore.rules` remains only for legacy tests and reference.
 
@@ -43,7 +43,7 @@ Before clearing a valid legacy cache, the candidate now preserves its business r
 
 If a cutover check fails, keep staff transactions stopped and repair the confirmed cause. Secure rules are currently deployed; maintenance deny-all rules are not currently active. If the failure requires another store migration or exposes data, deploy and verify maintenance rules before that work. Do not restore the old public rules or old browser password flow. Restore the backed-up store only after reconciling transactions created since the backup; a blind whole-document restore would erase newer sales. The encrypted backup and detailed recovery notes are stored outside the repository under `/Users/keng/.codex/backups/chomdoi-house/`, including `ROLLBACK-v2.md`.
 
-## Dependency follow-up found during main integration (26 September 2026)
+## Dependency audit before patch (26 September 2026; historical)
 
 `npm ci` and `npm run build` passed in the primary `main` checkout. Built JS/CSS SHA256 values match the verified deployed assets. `npm audit` reports seven vulnerable packages from the unchanged lockfile:
 
@@ -59,7 +59,31 @@ If a cutover check fails, keep staff transactions stopped and repair the confirm
 
 A read-only build with output writing disabled inspected 41 bundled module IDs; none of these seven packages appeared in the emitted browser JavaScript module list. This narrows their observed exposure in the current browser build; it does not make the installed Node/development dependencies safe or constitute a complete security audit. The maintainer advisories include [websocket-driver protocol handling](https://github.com/faye/websocket-driver-node/security/advisories/GHSA-xv26-6w52-cph6) and [Vite Windows development server path handling](https://github.com/vitejs/vite/security/advisories/GHSA-fx2h-pf6j-xcff).
 
-Next maintenance work: update affected dependencies on a separate `codex/` branch, inspect the lockfile diff, rerun the relevant Emulator/UI checks and production build, and recheck `npm audit` before adoption. Do not run an unreviewed forced major update. No package versions, deployed assets, credentials or Production data were changed during this integration check. Source rollback uses Git; it must not restore an old public Rules file or an old store snapshot.
+No package versions, deployed assets, credentials or Production data were changed during that initial integration check. The subsequent fix and verification follow.
+
+## Dependency security patch (26 September 2026; verified, not deployed)
+
+Started from baseline `6b7d463` on `codex/dependency-security`. Only the dependency manifests and documentation changed; no UI source, input fields, data model, Firestore Rules or Firebase project configuration changed. Firebase `12.12.1`, Chart.js `4.5.1` and the Firebase app/auth/firestore runtime SDK versions stayed unchanged. Vite was pinned to the patched `8.0.16` release; targeted lockfile updates resolved the Node transport vulnerabilities and supporting tooling packages without a forced major upgrade or overrides.
+
+| Audited package | Patched installed version |
+| --- | --- |
+| `websocket-driver` | `0.7.5` |
+| `@grpc/grpc-js` | `1.9.16` |
+| `protobufjs` | `7.6.6` |
+| `@protobufjs/utf8` | `1.1.2` |
+| `vite` | `8.0.16` |
+| `postcss` | `8.5.28` |
+| `nanoid` | `3.3.19` |
+
+Verification:
+
+- Fresh `npm ci` passed; `npm audit --json` reported 0 vulnerabilities across all severities at the time checked. This is an advisory-based dependency result, not a guarantee that the entire application has no security issues.
+- `npm run build` passed. CSS remains `index-BZ0AbyTV.css`; JS is now `index-BH2jw8ZS.js` because the compiler dependency changed. The existing >500 kB chunk warning remains. No layout restructuring or code splitting was included.
+- `rtk proxy env PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH npm run test:emulator:run` passed all 45 tests in 10 files, including simultaneous sales, sale/restock/cancellation concurrency, stale-edit rejection, confirmed writes, Rules and legacy-cache preservation.
+- UI checks used only the localhost Auth/Firestore Emulators with `demo-chomdoi-tests`: admin and cashier sign-in, expected role menus, opening a shift, recording one sale, preserving Thai text and emoji from the form exactly when read back, restocking three units with a Thai note, and a second browser tab receiving sale/stock changes without reload. Starting stock 20 became 19 after sale and 22 after restock. These were synthetic records, with LINE disabled. No Production credentials or store contents were used.
+- The initial anonymous read of the secure Emulator was denied; the input-preservation read then used the synthetic admin's Firebase token and passed. The test tabs and Emulators were shut down after verification. Screenshot evidence: `/Users/keng/.codex/backups/chomdoi-house/dependency-security-2026-09-26-ui.png`.
+
+Production still runs commit `22370b5`. This patch did not read/write Production Firestore, change Auth credentials, send LINE messages or deploy Hosting/Rules. To roll back the dependency change before deployment, revert the patch's manifest/lockfile changes in Git and run `npm ci`; keep the secure client and secure Rules. Do not restore a store snapshot. Any later adoption should use a Hosting-only deployment of the reviewed build; no database migration is required by this patch.
 
 ## Preparation and Emulator evidence (before deployment)
 

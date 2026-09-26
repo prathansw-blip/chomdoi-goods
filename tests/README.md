@@ -23,8 +23,8 @@ PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH npm run test:emulator:run
 `npm run test:emulator` is the inner test command. Run
 `npm run test:emulator:run` to start and stop the emulator automatically.
 
-`firestore.rules.test.js` records the current production rule behavior and its
-lost-sale risk. The other tests exercise the proposed staff rules, Firebase Auth
+`firestore.rules.test.js` records the legacy public rule behavior and its
+lost-sale risk. The other tests exercise the deployed staff rules, Firebase Auth
 membership checks, confirmed sale writes, and concurrent transactions. The
 Auth tests use mocks; Firestore rules and concurrent sales use the Emulator.
 No production data or credentials are used.

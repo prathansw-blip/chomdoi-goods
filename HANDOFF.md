@@ -1,13 +1,13 @@
 # Chomdoi Goods — คู่มือรับช่วงงาน
 
-อัปเดต: 26 กันยายน 2026 หลังย้ายข้อมูลและ deploy จริง ระบบ Production ใช้ application commit `22370b5` เจ้าของยืนยันว่า admin เข้าได้และสต็อกตรงกันทุกเครื่องแล้ว รวมประวัติ `codex/secure-sync-prep` เข้า `main` แบบ fast-forward เพื่อใช้เป็นจุดเริ่มพัฒนาต่อ โค้ดแอปและ secure Rules ตรงกับรุ่นที่ deploy; งานหลัง `22370b5` เป็นเอกสารและการจัดการไฟล์ใน Git
+อัปเดต: 26 กันยายน 2026 หลังย้ายข้อมูลและ deploy จริง ระบบ Production ใช้ application commit `22370b5` เจ้าของยืนยันว่า admin เข้าได้และสต็อกตรงกันทุกเครื่องแล้ว รวมประวัติ `codex/secure-sync-prep` เข้า `main` แบบ fast-forward เพื่อใช้เป็นจุดเริ่มพัฒนาต่อ โค้ดหน้าจอ/การกรอกข้อมูลและ secure Rules ตรงกับรุ่นที่ deploy; ต่อมาแก้แพ็กเกจที่มีช่องโหว่ใน `codex/dependency-security` และรวมเข้า `main` โดยยังไม่ deploy เพิ่ม
 
 ## เริ่มจากตรงไหน
 
 | รายการ | สถานะ |
 | --- | --- |
 | Repository | `https://github.com/prathansw-blip/chomdoi-goods` |
-| `main` / `origin/main` | รวมรุ่นที่ใช้งานจริงจาก `codex/secure-sync-prep` แล้ว; ตรวจ `git log -1` สำหรับ commit เอกสารล่าสุด; application commit ที่ deploy คือ `22370b5` |
+| `main` / `origin/main` | รวมรุ่นที่ใช้งานจริงและ dependency security patch แล้ว; ตรวจ `git log -1` สำหรับ commit ล่าสุด; application commit ที่ deploy ยังเป็น `22370b5` |
 | `codex/secure-sync-prep` | เก็บประวัติงาน cutover; มี Firebase Auth, transaction สำหรับหลายเครื่อง, กฎ staff และ Emulator tests |
 | Checkout หลักบนเครื่องนี้ | `/Users/keng/Documents/AI Project/Chomdoi Goods - Codex` อยู่บน `main` |
 | Worktree รุ่นที่ deploy แล้ว | `/Users/keng/.codex/worktrees/chomdoi-emulator-tests/Chomdoi Goods - Codex` อยู่บน `codex/secure-sync-prep` |
@@ -68,7 +68,9 @@ rtk proxy env PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH npm run dev:emulator
 
 หลังรวมเข้า `main` ติดตั้งด้วย `npm ci` ใน checkout หลักและตรวจ `npm run build` ผ่านอีกครั้ง ไฟล์ JS `index-jyccpGvU.js` และ CSS `index-BZ0AbyTV.css` มี SHA256 ตรงกับหลักฐาน deploy เดิม ไม่มีการ deploy เพิ่มหรือเชื่อมข้อมูล Production ระหว่าง build ไม่รันทดสอบ Emulator ซ้ำในรอบรวม Git เพราะโค้ดแอป/Rules/lockfile ไม่เปลี่ยนจากรุ่นที่ทดสอบและ deploy แล้ว
 
-งานถัดไปที่พบจากการติดตั้ง: `npm audit` รายงานแพ็กเกจมีช่องโหว่ 7 รายการ (moderate 1, high 5, critical 1) ตรวจ module list ของ production build แล้วไม่พบแพ็กเกจทั้ง 7 ในไฟล์ JavaScript ที่ส่งให้เบราว์เซอร์ แต่ยังต้องอัปเดต dependencies สำหรับเครื่องมือพัฒนา/Node ก่อนเพิ่มการใช้งานส่วนเหล่านั้น ดูรายการและขอบเขตใน `SECURITY_ROLLOUT.md` ยังไม่ได้แก้ lockfile ในรอบนี้
+แก้ dependency security patch แล้วเมื่อ 26 กันยายน 2026: Vite `8.0.16`, `@grpc/grpc-js` `1.9.16`, `websocket-driver` `0.7.5`, `protobufjs` `7.6.6`, `@protobufjs/utf8` `1.1.2`, PostCSS `8.5.28` และ nanoid `3.3.19` หลังติดตั้งใหม่ด้วย `npm ci` ผล `npm audit` เป็น **0 vulnerabilities** ตามฐานข้อมูล advisory ณ วันที่ตรวจ โดยคง Firebase `12.12.1`, Chart.js `4.5.1` และ Firebase app/auth/firestore SDK เดิม ไม่แก้ source ของหน้าจอ ฟอร์ม การคำนวณ หรือ Rules ดูขอบเขตและวิธีย้อนกลับใน `SECURITY_ROLLOUT.md`
+
+ผลทดสอบหลัง patch: Emulator tests **45/45 ผ่าน** จาก 10 ไฟล์ และ production build ผ่าน (ยังมีคำเตือน chunk เกิน 500 kB) ไฟล์ CSS ตรงกับเดิม; JS ใหม่เป็น `index-BH2jw8ZS.js` จึงไม่ถือว่าเหมือน deployed assets ทุก byte ทดสอบ UI บน `demo-chomdoi-tests` ผ่านทั้ง admin และ cashier: เปิดกะ ขายสินค้า 1 ชิ้น (สต็อก 20 → 19), ตรวจข้อความภาษาไทย/emoji จากฟอร์มเท่ากับข้อมูลที่อ่านกลับจาก Emulator, เติม 3 ชิ้น (19 → 22), และยืนยันหน้าจอที่สองรับรายการ/สต็อกใหม่โดยไม่ reload มีภาพหลักฐานข้อมูลจำลองบน Mac ที่ `/Users/keng/.codex/backups/chomdoi-house/dependency-security-2026-09-26-ui.png` ปิดแท็บทดสอบและ Emulators แล้ว ไม่มีการอ่าน/เขียนข้อมูล Production ส่ง LINE หรือ deploy ระหว่างรอบ patch นี้
 
 ## ผล cutover และงานที่ยังต้องทำ
 
