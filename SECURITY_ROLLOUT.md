@@ -1,8 +1,8 @@
-# Security rollout (deployed; admin access check unresolved)
+# Security rollout (deployed; owner confirmed admin webapp access)
 
 Firebase Hosting and `firestore.secure.rules` were deployed on 26 September 2026 at approximately 10:43 Bangkok time from `codex/secure-sync-prep`, application commit `22370b5`. Production is `https://chomdoi-house.web.app`. The deployed client uses Firebase Auth, active staff records and operation-specific transactions; the store no longer contains `users`. `main` remains the old application and must not be deployed as the current release.
 
-**Do not reopen staff transactions yet.** The owner reports that admin cannot enter the deployed webapp. The account is enabled and has an active admin staff record, but the generic login message does not identify whether credentials or subsequent access failed. Diagnosis is in progress; no password was changed as of this record. The old public `firestore.rules` remains only for legacy tests and reference.
+The owner confirmed normal admin access through the deployed webapp on 26 September 2026 at approximately 11:04 Bangkok time. The earlier failed attempt has no confirmed root cause; do not label it a password mismatch or Rules propagation issue. The last observed private diagnostic status had no check result or repair, no password-repair record was found, and its process and browser tab are closed. Codex did not reset a password or deploy a login fix during this investigation. Have each device close old tabs, open the current URL, sign in and check current sales/stock before resuming transactions. Keep Chrome data for the unresolved device reconciliation below. The old public `firestore.rules` remains only for legacy tests and reference.
 
 ## Completed cutover and verification
 
@@ -10,7 +10,7 @@ Firebase Hosting and `firestore.secure.rules` were deployed on 26 September 2026
 - A fresh encrypted backup was verified before migration at `/Users/keng/.codex/backups/chomdoi-house/2026-09-26T03-41-30-259Z-e410f9/`. Maintenance deny-all rules were deployed and their published source and anonymous denial were checked before the store write.
 - A guarded update removed only `users` and added `revision: 0`, using an update mask and the observed `updateTime` precondition. All other fields compared equal after the write, including LINE Settings. Production retained 14 products and 1,143 transactions. The new store update time was `2026-09-26T03:42:23.647120Z`.
 - Hosting HTML and JS/CSS matched local build bytes. Published ruleset `0725e012-e807-4a19-9e7a-6fac61c41aa9` matched `firestore.secure.rules`. An anonymous store read returned 403. Evidence is in `/Users/keng/.codex/backups/chomdoi-house/deployment-verification-1790394194282.json`.
-- Existing credentials for `ho`, `jom`, `wan` and `liyah` passed Firebase Auth and authenticated staff/store reads through REST. This does not confirm their browser UI experience. Admin webapp login remains unresolved. No synthetic sales or stock edits were written to Production. Auth accounts were not created, deleted or given new passwords.
+- Existing credentials for `ho`, `jom`, `wan` and `liyah` passed Firebase Auth and authenticated staff/store reads through REST. This does not confirm their browser UI experience. The owner subsequently confirmed normal admin webapp login. No synthetic sales or stock edits were written to Production. Codex did not create/delete Auth accounts or change passwords.
 - Post-cutover encrypted backup `/Users/keng/.codex/backups/chomdoi-house/2026-09-26T03-43-14-974Z-dab1f4/` was decrypted and verified, including the migrated store, five staff records, 11 Auth accounts, hash configuration and deployed secure Rules. Keys remain in this Mac's Keychain.
 
 ## Preparation checklist (historical; cutover completed)
