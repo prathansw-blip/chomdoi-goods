@@ -2,7 +2,7 @@
 
 This is a deployment checklist for the proposed `firestore.secure.rules`. It is **not** safe to deploy that file alone. The currently deployed web app still logs in against `stores/chomdoi_main.users`, writes that whole document, and reads the LINE token from it.
 
-Do not run a default `firebase deploy` before cutover. `firebase.json` now references `firestore.secure.rules`, but the candidate client still requires the store migration. Publishing the client or rules before auditing every used device, taking a final backup, and migrating the store can interrupt staff access. The old public `firestore.rules` remains only for legacy tests and reference.
+Do not run a default `firebase deploy` before cutover. `firebase.json` now references `firestore.secure.rules`, but the candidate client still requires the store migration. Publishing the client or rules before taking a final backup and migrating the store can interrupt staff access. Resolve the device-audit decision below before proceeding. The old public `firestore.rules` remains only for legacy tests and reference.
 
 ## Preconditions
 
@@ -15,7 +15,13 @@ Do not run a default `firebase deploy` before cutover. `firebase.json` now refer
 7. Check every device that has used the old app for unsynced local data. Preserve its browser storage before opening or reloading the old app: an online load can replace the local cache with the Firestore document. Reconcile pending sales and stock changes with Firestore before clearing browser storage or switching the app. The new client intentionally does not load the old local cache. Follow `MIGRATION_PREP.md` and use `scripts/audit-legacy-cache.mjs` only with private files outside the repository.
 8. Make a final encrypted backup on this Mac and verify that it can be decrypted. Record the latest document update time and Auth user count before cutover. The owner chose Mac-only storage and accepts that losing the Mac and its Keychain together can make this backup unusable.
 
-## Cutover (requires a maintenance window and completed device audit)
+## Owner-directed device-audit exception (26 September 2026)
+
+The owner explicitly instructed deployment to proceed without auditing the Windows PC and Android Chrome caches. Only Chrome on this Mac has been audited. Pending sales or stock changes on the other two devices remain unknown and will not automatically sync into the new client later. Preserve their Chrome data; do not clear it or import an old whole-document export. Any later recovery requires a separate comparison and reconciliation against the current server data. This exception removes the device audit as a deployment blocker; the maintenance window, verified final backup, update-time precondition, and deployment checks still apply.
+
+Before clearing a valid legacy cache, the candidate now preserves its business record arrays under `chomdoi_legacy_recovery_<timestamp>` in localStorage. It excludes users and settings, recursively strips credential fields, never imports the copy into live state, and never writes it to Firestore. Existing copies are retained. If storage quota prevents a second copy, it keeps the sanitized records in the original slot. Malformed or inaccessible cache is left untouched and logged without values. This preservation has passed synthetic tests; the actual Windows/Android copies cannot be confirmed until those devices run the new client. These temporary device records are for later reconciliation; the encrypted central backup remains on the Mac.
+
+## Cutover (requires a maintenance window)
 
 1. Stop staff transactions and make the final backup.
 2. Publish `firestore.maintenance.rules` through `firebase.maintenance.json` so the old public document cannot be read or written during migration. Check the published source before the store write.
@@ -31,7 +37,7 @@ If a cutover check fails, stop transactions and keep the database locked while r
 
 - The owner approved five staff roles. Five `/staff/{uid}` records were created atomically in Production and verified by reading them back; six unmatched Auth accounts have no staff record. The store document, Auth accounts, deployed Rules and Hosting were not changed. A post-write encrypted backup including staff was verified on this Mac.
 - A sanitized copy of that encrypted backup was restored to a localhost-only Firestore Emulator: 14 products, 1,140 transactions, and five staff records matched. The exact masked write used for store cutover removed `users`, added `revision: 0`, and preserved other fields under an update-time precondition. A local run under secure rules denied an unauthenticated restore request, as expected; the successful drill used a separate local-only open-rules configuration. No Production store write was made.
-- The owner confirmed that additional devices have used the old app. Their browser caches must be audited before cutover.
+- The owner identified one Windows PC and one Android phone using Chrome, then explicitly instructed deployment to proceed without their cache audits. Their local-only data is still unverified and does not automatically sync into the new client.
 - `tests/firestore.rules.test.js` reproduces unauthenticated access and a lost sale under the current rules.
 - `tests/firestore.secure.rules.test.js` checks the proposed staff gate and rejects a stale revision.
 - `tests/sale.transaction.test.js` verifies two simultaneous sales, sale/restock/cancellation concurrency, stale stock rejection, shift-close protection, settings merge, daily-check conflict, and recovery after an injected `unavailable` write failure using synthetic data. The failure injection is not a real network outage.

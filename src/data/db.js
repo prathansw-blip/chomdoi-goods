@@ -1,4 +1,4 @@
-// Firestore persistence. Financial data is never sourced from a browser cache.
+// Firestore persistence. Live financial data is never sourced from a browser cache.
 import { initializeApp } from "firebase/app";
 import {
   collection,
@@ -15,6 +15,7 @@ import { defaultSettings } from "./seedData.js";
 import { applySale, retryRevisionTransaction } from "./sale.js";
 import { applyRestock } from "./restock.js";
 import { applyStoreOperation } from "./operations.js";
+import { preserveLegacyCache } from "./legacy-cache.js";
 
 let db = null;
 let app = null;
@@ -22,7 +23,6 @@ let auth = null;
 let unsubscribers = [];
 let latestExportData = null;
 const STORE_ID = "chomdoi_main";
-const LS_KEY = "chomdoi_goods_data";
 
 const emulatorMode = import.meta.env.MODE === "emulator";
 export const FIREBASE_CONFIG = emulatorMode
@@ -189,7 +189,14 @@ export function unsubscribeAll() {
 
 export function clearAllData() {
   latestExportData = null;
-  localStorage.removeItem(LS_KEY);
+  try {
+    const recovery = preserveLegacyCache(localStorage);
+    if (["unreadable", "failed", "changed"].includes(recovery.status)) {
+      console.warn("Legacy device data could not be fully archived; keep this browser's storage for review.");
+    }
+  } catch {
+    console.warn("Legacy device data could not be fully archived; keep this browser's storage for review.");
+  }
 }
 
 export function exportData() {

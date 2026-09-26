@@ -21,6 +21,7 @@ let deferredSnapshot = null;
 // ─── Instant Sync Init (0ms Blocking) ───
 export function initStoreSync() {
   if (!state) {
+    clearAllData();
     state = getInitialDataSync();
   }
   return state;

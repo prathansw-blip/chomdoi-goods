@@ -36,6 +36,8 @@ function indexedRecords(store, field, key) {
 }
 
 export function auditLegacySnapshots(server, device) {
+  if (server?.format === "chomdoi-legacy-recovery-v1") server = server.snapshot;
+  if (device?.format === "chomdoi-legacy-recovery-v1") device = device.snapshot;
   if (!server || !device || typeof server !== "object" || typeof device !== "object") {
     throw new Error("Two store snapshots are required");
   }
