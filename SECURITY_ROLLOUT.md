@@ -103,6 +103,14 @@ Before sign-in, the webapp cannot read the protected `settings.companyLogo` from
 
 Pre-deploy release `1790409617241000`, version `485992fc0f17872a`, is retained by Firebase. The backup at `/Users/keng/.codex/backups/chomdoi-house/login-logo-2026-09-26T08-16-02.257Z/` has the previous public files, candidate build, release metadata, verification hashes and Hosting-only rollback steps. If the new logo release causes a problem, roll Hosting back to `485992fc0f17872a`; do not restore Firestore or Rules.
 
+## Yearly monthly sales chart (29 September 2026; deployed to Hosting only)
+
+Application commit `ed1a0a2` adds a 12-month sales bar chart below the daily chart in Shift > History, with a year selector and a readable 12-month table. Both charts count paid cash and transfer transactions, matching the existing monthly total; free transactions remain visible in the existing separate badge and are excluded from paid sales. This changes presentation only, with no Firestore schema, business records, Auth, Rules or LINE setting changes.
+
+`npm run build` passed with the existing chunk over 500 kB warning, and 45/45 Emulator tests passed. Chrome UI testing used only synthetic `demo-chomdoi-tests` Auth/Firestore data and confirmed 2026 annual paid sales ฿700, September ฿350, 2025 annual paid sales ฿100, the year selector, and the 12-month table. Screenshot: `/Users/keng/.codex/backups/chomdoi-house/yearly-sales-chart-2026-09-29-demo.png`. No Production Firestore data was read or written during testing or deployment.
+
+Hosting-only deployment completed at `2026-09-28T20:26:59.187Z` (03:26:59 Bangkok, 29 September 2026), release `1790627219187000`, version `f6a376d24dc961e9`. Public HTTP requests confirmed SHA256 equality for all six built files and the SPA rewrite. The backup `/Users/keng/.codex/backups/chomdoi-house/yearly-chart-2026-09-28T20-26-13-628761Z/` contains the previous public files, candidate build, manifest, live release metadata, verification results and Hosting-only rollback instructions. If necessary, roll Hosting back to retained version `93c6d493717a0e91`, release `1790410653000000`, then verify its public files against `manifest.json`. No Firestore restore or Rules change is needed.
+
 ## Preparation and Emulator evidence (before deployment)
 
 - The owner approved five staff roles. Five `/staff/{uid}` records were created atomically in Production and verified by reading them back; six unmatched Auth accounts have no staff record. The store document, Auth accounts, deployed Rules and Hosting were not changed. A post-write encrypted backup including staff was verified on this Mac.

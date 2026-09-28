@@ -1,17 +1,17 @@
 # Chomdoi Goods — คู่มือรับช่วงงาน
 
-อัปเดต: 26 กันยายน 2026 ระบบ Production ใช้ build จาก application commit `41f6a03` หลังแก้โลโก้หน้า login และเผยแพร่เฉพาะ Firebase Hosting เวลา 15:17 น. ไทย build นี้รวม dependency security patch ที่ deploy เวลา 15:00 น. ด้วย โฟลว์ login, การกรอกข้อมูลธุรกิจ, โครงสร้างข้อมูล และ secure Rules ไม่เปลี่ยนจากรุ่น cutover `22370b5` ที่เจ้าของยืนยันว่า admin เข้าได้และสต็อกตรงกันทุกเครื่อง; เปลี่ยนเฉพาะภาพ fallback ของ logo หน้า login
+อัปเดต: 29 กันยายน 2026 ระบบ Production ใช้ build จาก application commit `ed1a0a2` หลังเพิ่มกราฟยอดขายรายปีเทียบ 12 เดือนใต้กราฟรายวันในหน้าประวัติย้อนหลัง เผยแพร่เฉพาะ Firebase Hosting เวลา 03:26 น. ไทย รุ่นนี้รวม dependency security patch และ login logo fix ก่อนหน้าด้วย โฟลว์ login, การกรอกข้อมูลธุรกิจ, โครงสร้างข้อมูล และ secure Rules ไม่เปลี่ยนจากรุ่น cutover `22370b5` ที่เจ้าของยืนยันว่า admin เข้าได้และสต็อกตรงกันทุกเครื่อง
 
 ## เริ่มจากตรงไหน
 
 | รายการ | สถานะ |
 | --- | --- |
 | Repository | `https://github.com/prathansw-blip/chomdoi-goods` |
-| `main` / `origin/main` | รวมรุ่นที่ใช้งานจริง, dependency security patch และ login logo fix แล้ว; ตรวจ `git log -1` สำหรับ commit ล่าสุด; application commit ที่ deploy คือ `41f6a03` |
+| `main` / `origin/main` | รวมรุ่นที่ใช้งานจริงและกราฟยอดขายรายปีแล้ว; ตรวจ `git log -1` สำหรับ commit ล่าสุด; application commit ที่ deploy คือ `ed1a0a2` |
 | `codex/secure-sync-prep` | เก็บประวัติงาน cutover; มี Firebase Auth, transaction สำหรับหลายเครื่อง, กฎ staff และ Emulator tests |
 | Checkout หลักบนเครื่องนี้ | `/Users/keng/Documents/AI Project/Chomdoi Goods - Codex` อยู่บน `main` |
 | Worktree ประวัติ cutover | `/Users/keng/.codex/worktrees/chomdoi-emulator-tests/Chomdoi Goods - Codex` อยู่บน `codex/secure-sync-prep` |
-| สถานะ release | Cutover Hosting และ secure Rules เวลา 10:43 น. ไทย; เจ้าของยืนยัน admin เข้าได้เวลา 11:04 น. และสต็อกตรงทุกเครื่อง; เผยแพร่ dependency patch เวลา 15:00 น. และ login logo fix เฉพาะ Hosting เวลา 15:17 น. ไทยเมื่อ 26 กันยายน 2026 |
+| สถานะ release | Cutover Hosting และ secure Rules เมื่อ 26 กันยายน 2026; เจ้าของยืนยัน admin เข้าได้และสต็อกตรงทุกเครื่อง; กราฟยอดขายรายปี deploy เฉพาะ Hosting เมื่อ 29 กันยายน 2026 เวลา 03:26 น. ไทย |
 
 เริ่มงานพัฒนาต่อจาก `main` ที่ checkout หลักข้างต้น หรือสร้าง branch `codex/<ชื่องาน>` จาก `main` สำหรับงานใหม่ ตรวจ branch ด้วย `git status -sb` ก่อนแก้ไฟล์ เอกสาร HANDOFF รุ่นก่อน cutover ที่เคยค้างใน checkout หลักเก็บไว้ใน Git stash ชื่อ `Preserve pre-cutover local handoff before main fast-forward` และตรงกับเอกสารที่มีอยู่ในประวัติ Git แล้ว ไฟล์ cache ของ Firebase CLI และ `.serena/` เป็นข้อมูลเฉพาะเครื่องและถูก ignore
 
@@ -75,6 +75,8 @@ rtk proxy env PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH npm run dev:emulator
 เจ้าของอนุมัติและเผยแพร่แพตช์เฉพาะ Hosting แล้วเมื่อ 26 กันยายน 2026 เวลา 15:00:17 น. ไทยจาก `13c9112` รุ่น Hosting `485992fc0f17872a` ตรวจไฟล์เว็บจริงทั้ง 5 ไฟล์ตรงกับ build ทุก byte พร้อมตรวจ SPA rewrite และ header ของ HTML/JS/CSS โดยใช้คำขอสาธารณะ ไม่รันเบราว์เซอร์ที่ล็อกอิน ไม่อ่าน/เขียน Firestore ไม่เปลี่ยน Auth หรือส่ง LINE สำรองไฟล์เว็บเดิม รุ่นใหม่ หลักฐาน และวิธีย้อนกลับเฉพาะ Hosting ไว้ที่ `/Users/keng/.codex/backups/chomdoi-house/dependency-hosting-2026-09-26T08-00-01.390Z/` รุ่น Hosting ก่อนแพตช์คือ `1b36ddb7160f2d62`; ไม่ต้องกู้ฐานข้อมูลเพื่อย้อนแพตช์นี้
 
 แก้ logo หน้า login ใน commit `41f6a03`: ก่อน login แอปยังอ่าน `settings.companyLogo` ใน Firestore ไม่ได้เพราะยังไม่ได้ผ่าน Auth จึงแสดง emoji แทนโลโก้ที่อัปโหลดไว้ เพิ่มสำเนา logo ใน `src/assets/chomdoi-house-logo.png` และใช้เป็นค่าเริ่มต้นเมื่อยังไม่มี `companyLogo`; ค่าใน Settings ยังใช้ตามเดิมเมื่อมีใน state การเปลี่ยนนี้ไม่แก้ Settings, login, Firestore หรือข้อมูลธุรกิจ Deploy Firebase Hosting รุ่น `93c6d493717a0e91` / release `1790410653000000` เวลา 15:17:33 ไทย ตรวจ HTML, JS, CSS, PNG, SVG และ SPA rewrite โดยใช้ public requests ทั้งหมดตรงกับ build; JS อ้างถึงไฟล์ logo ที่เพิ่มเข้ามา Build ผ่านและมีคำเตือน chunk เกิน 500 kB ตามเดิม สำรองไฟล์เดิม/รุ่นใหม่และวิธีย้อนกลับไว้ที่ `/Users/keng/.codex/backups/chomdoi-house/login-logo-2026-09-26T08-16-02.257Z/` รุ่นก่อน logo fix คือ `485992fc0f17872a`; ถ้าต้องย้อนกลับให้ rollback Hosting release เท่านั้น ไม่ต้องกู้ข้อมูล Firestore
+
+เพิ่มกราฟยอดขายรายปีใน commit `ed1a0a2`: หน้าสรุปกะ > ประวัติย้อนหลัง แสดงกราฟ 12 เดือนใต้กราฟรายวัน เลือกปีได้ และกางตารางตัวเลขรายเดือนได้ ยอดขายในกราฟรายวัน/รายปีนับเงินสดและโอน ไม่รวมรายการฟรี เพื่อให้ตรงกับยอดรวมรายเดือนที่มีอยู่เดิม ทดสอบด้วยข้อมูลจำลองใน Auth/Firestore Emulator: ยอดปี 2569 ฿700, กันยายน ฿350, เปลี่ยนไปปี 2568 ได้ ฿100; Emulator tests ผ่าน 45/45 และ build ผ่านพร้อมคำเตือน chunk เกิน 500 kB ตามเดิม Deploy เฉพาะ Hosting รุ่น `f6a376d24dc961e9` / release `1790627219187000` เวลา 03:26:59 น. ไทย ตรวจ public files ทั้ง 6 ไฟล์และ SPA rewrite ตรงกับ build ทุก byte ไม่อ่าน/เขียน Firestore Production และไม่เปลี่ยน Auth, Rules, LINE หรือโครงสร้างข้อมูล สำรองไฟล์เว็บรุ่นก่อน/รุ่นใหม่และขั้นตอนย้อนกลับไว้ที่ `/Users/keng/.codex/backups/chomdoi-house/yearly-chart-2026-09-28T20-26-13-628761Z/`; รุ่นก่อนคือ `93c6d493717a0e91` ภาพทดสอบข้อมูลจำลองอยู่ที่ `/Users/keng/.codex/backups/chomdoi-house/yearly-sales-chart-2026-09-29-demo.png`
 
 ## ผล cutover และงานที่ยังต้องทำ
 
