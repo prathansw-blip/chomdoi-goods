@@ -1074,9 +1074,29 @@ body.modal-open .page-content {
   padding: 1.25rem;
   margin-bottom: 1.25rem;
 }
+.history-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+.history-layout > * {
+  min-width: 0;
+}
+@media (max-width: 768px) {
+  .history-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .history-year-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.history-year-controls {
+  display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -1097,6 +1117,11 @@ body.modal-open .page-content {
   color: var(--text-primary);
   font: inherit;
   cursor: pointer;
+}
+.history-year-toggle {
+  min-height: 44px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
 }
 .history-year-select:focus-visible,
 .history-year-details summary:focus-visible {

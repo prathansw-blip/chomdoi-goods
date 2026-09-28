@@ -58,6 +58,7 @@ let yearChartInstance = null;
 let viewMode = "current";
 let selectedDate = null;
 let showChartLabels = true;
+let showYearChartLabels = true;
 let selectedHistoryMonth = null;
 const thaiMonthNames = [
   "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
@@ -734,7 +735,7 @@ function drawHistory(el, settings, currency) {
   }
 
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:280px 1fr;gap:1.25rem;align-items:start">
+    <div class="history-layout">
       <!-- Date list -->
       <div class="card" style="max-height:600px;overflow-y:auto">
         <div class="card-header">📅 เลือกวัน</div>
@@ -766,14 +767,6 @@ function drawHistory(el, settings, currency) {
       </div>
     </div>
   `;
-
-  // Responsive
-  if (!document.getElementById("history-style")) {
-    const s = document.createElement("style");
-    s.id = "history-style";
-    s.textContent = `@media(max-width:768px){#shift-body [style*="grid-template-columns: 280px"]{grid-template-columns:1fr !important}}`;
-    document.head.appendChild(s);
-  }
 
   // Date click
   el.querySelectorAll(".history-date-item").forEach((item) => {
@@ -905,11 +898,16 @@ function drawMonthSummary(el, activeMonth, settings, currency, sortedDates, tran
     <div class="chart-container">
       <div class="card-header history-year-header">
         <span>📊 ยอดขายรายปี (เทียบแต่ละเดือน)</span>
-        <label for="select-history-year">ปี
-          <select id="select-history-year" class="history-year-select" aria-label="เลือกปีสำหรับกราฟยอดขายรายปี">
-            ${availableYears.map((optionYear) => `<option value="${optionYear}" ${year === optionYear ? "selected" : ""}>${optionYear + 543}</option>`).join("")}
-          </select>
-        </label>
+        <div class="history-year-controls">
+          <label for="select-history-year">ปี
+            <select id="select-history-year" class="history-year-select" aria-label="เลือกปีสำหรับกราฟยอดขายรายปี">
+              ${availableYears.map((optionYear) => `<option value="${optionYear}" ${year === optionYear ? "selected" : ""}>${optionYear + 543}</option>`).join("")}
+            </select>
+          </label>
+          ${yearTotal > 0 ? `<button class="btn btn-outline history-year-toggle" id="btn-toggle-year-labels" type="button" aria-pressed="${showYearChartLabels}">
+            ${showYearChartLabels ? "🙈 ซ่อนตัวเลข" : "👁️ แสดงตัวเลข"}
+          </button>` : ""}
+        </div>
       </div>
       <p class="history-year-total">ยอดขายรวมปี ${year + 543}: <strong>${formatCurrency(yearTotal, currency)}</strong> <span>(เงินสดและโอน ไม่รวมรายการฟรี)</span></p>
       ${yearTotal === 0
@@ -947,6 +945,16 @@ function drawMonthSummary(el, activeMonth, settings, currency, sortedDates, tran
   }
 
   buildYearChart(yearlySales, year, month - 1, currency);
+
+  const yearToggleBtn = document.getElementById("btn-toggle-year-labels");
+  if (yearToggleBtn) {
+    yearToggleBtn.onclick = () => {
+      showYearChartLabels = !showYearChartLabels;
+      yearToggleBtn.textContent = showYearChartLabels ? "🙈 ซ่อนตัวเลข" : "👁️ แสดงตัวเลข";
+      yearToggleBtn.setAttribute("aria-pressed", String(showYearChartLabels));
+      yearChartInstance?.update();
+    };
+  }
 
   const yearSelect = document.getElementById("select-history-year");
   yearSelect.onchange = (e) => {
@@ -1068,6 +1076,7 @@ function buildYearChart(monthlySales, year, selectedMonthIndex, currency) {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
+      layout: { padding: { top: 12, right: 32 } },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -1080,7 +1089,7 @@ function buildYearChart(monthlySales, year, selectedMonthIndex, currency) {
       scales: {
         y: {
           beginAtZero: true,
-          grace: "10%",
+          grace: "15%",
           grid: { color: "rgba(42,53,80,0.5)" },
           ticks: {
             color: "#94a3b8",
@@ -1090,6 +1099,30 @@ function buildYearChart(monthlySales, year, selectedMonthIndex, currency) {
         x: { grid: { display: false }, ticks: { color: "#94a3b8" } },
       },
     },
+    plugins: [{
+      id: "yearBarLabels",
+      afterDatasetsDraw(chart) {
+        if (!showYearChartLabels) return;
+        const { ctx, data } = chart;
+        ctx.save();
+        ctx.font = 'bold 9px "Inter", sans-serif';
+        ctx.fillStyle = "#fcd34d";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+
+        chart.getDatasetMeta(0).data.forEach((bar, index) => {
+          const value = data.datasets[0].data[index];
+          if (value > 0) {
+            ctx.save();
+            ctx.translate(bar.x, bar.y - 6);
+            ctx.rotate(-Math.PI / 4);
+            ctx.fillText(formatCurrency(value, currency), 0, 0);
+            ctx.restore();
+          }
+        });
+        ctx.restore();
+      },
+    }],
   });
 }
 
