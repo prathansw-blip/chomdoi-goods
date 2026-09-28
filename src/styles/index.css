@@ -1074,6 +1074,66 @@ body.modal-open .page-content {
   padding: 1.25rem;
   margin-bottom: 1.25rem;
 }
+.history-year-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.history-year-header label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.history-year-select {
+  min-height: 44px;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.history-year-select:focus-visible,
+.history-year-details summary:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.history-year-total {
+  margin: 0 0 1rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.history-year-total strong {
+  color: var(--gold);
+  font-size: 1.1rem;
+}
+.history-year-chart-scroll {
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+.history-year-chart-frame {
+  position: relative;
+  min-width: 620px;
+  height: 285px;
+}
+.history-year-details {
+  margin-top: 0.75rem;
+}
+.history-year-details summary {
+  min-height: 44px;
+  padding: 0.75rem 0;
+  color: var(--gold);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.history-year-details .table-wrap {
+  margin-top: 0.5rem;
+}
 
 /* ═══ ANIMATIONS ═══ */
 @keyframes fadeIn {

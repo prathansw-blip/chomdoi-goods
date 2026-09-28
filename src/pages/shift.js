@@ -54,10 +54,30 @@ Chart.register(
 
 let unsub = null;
 let chartInstance = null;
+let yearChartInstance = null;
 let viewMode = "current";
 let selectedDate = null;
 let showChartLabels = true;
 let selectedHistoryMonth = null;
+const thaiMonthNames = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+const thaiMonthShortNames = [
+  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
+];
+
+function destroyCharts() {
+  if (chartInstance) {
+    chartInstance.destroy();
+    chartInstance = null;
+  }
+  if (yearChartInstance) {
+    yearChartInstance.destroy();
+    yearChartInstance = null;
+  }
+}
 
 // Helper: สรุปยอดแยกตามวิธีชำระเงิน
 function paymentBreakdown(txns) {
@@ -98,6 +118,7 @@ export function renderShift(container) {
 }
 
 function draw(container) {
+  destroyCharts();
   const settings = getSettings();
   const currency = settings.currency || "฿";
   const shiftDefs = settings.shiftDefinitions || [];
@@ -704,7 +725,7 @@ function drawHistory(el, settings, currency) {
   }
 
   // Set default selected month if null
-  if (!selectedHistoryMonth) {
+  if (!selectedHistoryMonth || !uniqueMonths.includes(selectedHistoryMonth)) {
     selectedHistoryMonth = uniqueMonths[0];
   }
 
@@ -804,23 +825,18 @@ function drawMonthSummary(el, activeMonth, settings, currency, sortedDates, tran
   const monthPb = paymentBreakdown(monthTxns);
   const monthTotal = monthPb.total;
 
-  const thaiMonthNames = [
-    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-  ];
   const monthLabel = `${thaiMonthNames[month - 1]} ${year + 543}`;
 
   // Calculate daily sales for chart
   const dailySales = Array(daysInMonth).fill(0);
-  const dailyBills = Array(daysInMonth).fill(0);
   const uniqueSaleDays = new Set();
 
   monthTxns.forEach((t) => {
     const bd = t.businessDate || getBusinessDate(t.timestamp, startHour);
     const dayNum = parseInt(bd.split("-")[2], 10);
-    if (dayNum >= 1 && dayNum <= daysInMonth) {
+    const method = t.paymentMethod || "cash";
+    if (dayNum >= 1 && dayNum <= daysInMonth && (method === "cash" || method === "transfer")) {
       dailySales[dayNum - 1] += t.total;
-      dailyBills[dayNum - 1] += 1;
       if (t.total > 0) {
         uniqueSaleDays.add(bd);
       }
@@ -829,6 +845,17 @@ function drawMonthSummary(el, activeMonth, settings, currency, sortedDates, tran
 
   const numSaleDays = uniqueSaleDays.size || 1;
   const averagePerDay = monthTotal / numSaleDays;
+
+  const yearMonths = Array.from({ length: 12 }, () => []);
+  transactions.forEach((t) => {
+    const bd = t.businessDate || getBusinessDate(t.timestamp, startHour);
+    if (!bd.startsWith(`${year}-`)) return;
+    const monthIndex = Number(bd.slice(5, 7)) - 1;
+    if (monthIndex >= 0 && monthIndex < 12) yearMonths[monthIndex].push(t);
+  });
+  const yearlySales = yearMonths.map((txns) => paymentBreakdown(txns).total);
+  const yearTotal = yearlySales.reduce((total, value) => total + value, 0);
+  const availableYears = [...new Set(uniqueMonths.map((m) => Number(m.slice(0, 4))))];
 
   el.innerHTML = `
     <div class="card" style="margin-bottom:1.25rem">
@@ -864,7 +891,7 @@ function drawMonthSummary(el, activeMonth, settings, currency, sortedDates, tran
         ? `
       <div class="chart-container">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-          <span>📈 ยอดขายรายวัน (เดือน ${monthLabel})</span>
+          <span>📈 ยอดขายรายวัน (เดือน ${monthLabel}, ไม่รวมรายการฟรี)</span>
           <button class="btn btn-outline" id="btn-toggle-labels" style="padding:0.25rem 0.6rem;font-size:0.8rem;height:auto">
             ${showChartLabels ? "🙈 ซ่อนตัวเลข" : "👁️ แสดงตัวเลข"}
           </button>
@@ -874,6 +901,34 @@ function drawMonthSummary(el, activeMonth, settings, currency, sortedDates, tran
     `
         : '<div class="card"><div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-text">ยังไม่มีข้อมูลยอดขายในเดือนนี้</div></div></div>'
     }
+
+    <div class="chart-container">
+      <div class="card-header history-year-header">
+        <span>📊 ยอดขายรายปี (เทียบแต่ละเดือน)</span>
+        <label for="select-history-year">ปี
+          <select id="select-history-year" class="history-year-select" aria-label="เลือกปีสำหรับกราฟยอดขายรายปี">
+            ${availableYears.map((optionYear) => `<option value="${optionYear}" ${year === optionYear ? "selected" : ""}>${optionYear + 543}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <p class="history-year-total">ยอดขายรวมปี ${year + 543}: <strong>${formatCurrency(yearTotal, currency)}</strong> <span>(เงินสดและโอน ไม่รวมรายการฟรี)</span></p>
+      ${yearTotal === 0
+        ? '<div class="empty-state"><div class="empty-state-text">ยังไม่มีรายการขายที่ชำระเงินในปีนี้</div></div>'
+        : `<div class="history-year-chart-scroll">
+            <div class="history-year-chart-frame">
+              <canvas id="history-year-chart" role="img" aria-label="ยอดขายรายเดือน ปี ${year + 543}"></canvas>
+            </div>
+          </div>`}
+      <details class="history-year-details">
+        <summary>ดูยอดขายแต่ละเดือนเป็นตัวเลข</summary>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th scope="col">เดือน</th><th scope="col" style="text-align:right">ยอดขาย</th></tr></thead>
+            <tbody>${thaiMonthNames.map((name, index) => `<tr><td>${name}</td><td style="text-align:right">${formatCurrency(yearlySales[index], currency)}</td></tr>`).join("")}</tbody>
+          </table>
+        </div>
+      </details>
+    </div>
   `;
 
   if (monthTxns.length > 0) {
@@ -890,6 +945,15 @@ function drawMonthSummary(el, activeMonth, settings, currency, sortedDates, tran
       };
     }
   }
+
+  buildYearChart(yearlySales, year, month - 1, currency);
+
+  const yearSelect = document.getElementById("select-history-year");
+  yearSelect.onchange = (e) => {
+    selectedHistoryMonth = uniqueMonths.find((m) => m.startsWith(`${e.target.value}-`));
+    selectedDate = null;
+    draw(el.closest(".page-content"));
+  };
 
   // Hook change event of dropdown
   const monthSelect = document.getElementById("select-history-month");
@@ -977,6 +1041,55 @@ function buildMonthChart(dailySales, daysInMonth, monthLabel) {
         }
       }
     ]
+  });
+}
+
+function buildYearChart(monthlySales, year, selectedMonthIndex, currency) {
+  const canvas = document.getElementById("history-year-chart");
+  if (!canvas) return;
+
+  yearChartInstance = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: thaiMonthShortNames,
+      datasets: [{
+        label: "ยอดขาย",
+        data: monthlySales,
+        backgroundColor: monthlySales.map((_, index) =>
+          index === selectedMonthIndex ? "rgba(245,158,11,0.9)" : "rgba(245,158,11,0.55)"
+        ),
+        borderColor: "#f59e0b",
+        borderWidth: 1,
+        borderRadius: 4,
+        maxBarThickness: 48,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (context) => `${thaiMonthNames[context[0].dataIndex]} ${year + 543}`,
+            label: (context) => `ยอดขาย: ${formatCurrency(context.raw, currency)}`,
+          },
+        },
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grace: "10%",
+          grid: { color: "rgba(42,53,80,0.5)" },
+          ticks: {
+            color: "#94a3b8",
+            callback: (value) => formatCurrency(value, currency),
+          },
+        },
+        x: { grid: { display: false }, ticks: { color: "#94a3b8" } },
+      },
+    },
   });
 }
 
@@ -1172,8 +1285,5 @@ export function destroyShift() {
     unsub();
     unsub = null;
   }
-  if (chartInstance) {
-    chartInstance.destroy();
-    chartInstance = null;
-  }
+  destroyCharts();
 }
