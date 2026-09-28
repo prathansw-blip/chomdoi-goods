@@ -111,6 +111,14 @@ Application commit `ed1a0a2` adds a 12-month sales bar chart below the daily cha
 
 Hosting-only deployment completed at `2026-09-28T20:26:59.187Z` (03:26:59 Bangkok, 29 September 2026), release `1790627219187000`, version `f6a376d24dc961e9`. Public HTTP requests confirmed SHA256 equality for all six built files and the SPA rewrite. The backup `/Users/keng/.codex/backups/chomdoi-house/yearly-chart-2026-09-28T20-26-13-628761Z/` contains the previous public files, candidate build, manifest, live release metadata, verification results and Hosting-only rollback instructions. If necessary, roll Hosting back to retained version `93c6d493717a0e91`, release `1790410653000000`, then verify its public files against `manifest.json`. No Firestore restore or Rules change is needed.
 
+## Yearly chart value labels (29 September 2026; deployed to Hosting only)
+
+Application commit `47f6571` draws 45° paid-sales value labels above annual chart bars by default and adds an independent show/hide button. The History layout now stacks its date list and charts on narrow screens, keeping the year selector and toggle within the viewport; the 12-month chart remains horizontally scrollable. No transaction calculations, stored business data, Firestore schema, Auth, Rules or LINE settings changed.
+
+`npm run build` passed with the existing chunk over 500 kB warning. Chrome UI checks against local synthetic Auth/Firestore Emulators confirmed annual total ฿28,250, default labels, hide/show toggling, and usable controls at a mobile viewport. Evidence: `/Users/keng/.codex/backups/chomdoi-house/year-chart-labels-2026-09-29-demo.png` and `/Users/keng/.codex/backups/chomdoi-house/year-chart-labels-2026-09-29-mobile-demo.png`. No Production Firestore data was read or written for this release.
+
+Hosting-only deployment completed at `2026-09-28T20:36:12.566Z` (03:36:12 Bangkok, 29 September 2026), release `1790627772566000`, version `e13f37af66fb93d6`. Public HTTP requests confirmed SHA256 equality for all six built files and the SPA rewrite. The backup `/Users/keng/.codex/backups/chomdoi-house/year-chart-labels-2026-09-29/` contains the previous public files, candidate build, manifest, release metadata, verification results and rollback instructions. If needed, roll Hosting back to retained version `f6a376d24dc961e9`, release `1790627219187000`; no Firestore restore or Rules change is needed.
+
 ## Preparation and Emulator evidence (before deployment)
 
 - The owner approved five staff roles. Five `/staff/{uid}` records were created atomically in Production and verified by reading them back; six unmatched Auth accounts have no staff record. The store document, Auth accounts, deployed Rules and Hosting were not changed. A post-write encrypted backup including staff was verified on this Mac.
