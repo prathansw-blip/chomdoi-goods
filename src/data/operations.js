@@ -1,5 +1,6 @@
 // Apply one user action to the latest Firestore document inside a transaction.
 // Return only the top-level fields changed by that action.
+import { hasShiftForBusinessDate } from "./shifts.js";
 function same(left, right) {
   if (Object.is(left, right)) return true;
   if (Array.isArray(left) || Array.isArray(right)) {
@@ -113,6 +114,13 @@ export function applyStoreOperation(store, operation) {
     case "startShift": {
       if (!op.shift?.id) throw new Error("INVALID_SHIFT");
       if (existingById(store.shifts, op.shift.id)) return null;
+      if (!op.shift.defId || !op.shift.name || !/^\d{4}-\d{2}-\d{2}$/.test(op.shift.businessDate || "")) {
+        throw new Error("INVALID_SHIFT");
+      }
+      if (hasShiftForBusinessDate(store.shifts, op.shift, op.shift.businessDate,
+        store.settings?.businessDayStartHour ?? 8)) {
+        throw new Error("SHIFT_ALREADY_EXISTS");
+      }
       const active = (store.shifts || []).find((item) => item.status === "active");
       if ((active?.id || null) !== (op.expectedActiveId || null)) conflict();
       return { shifts: [

@@ -227,6 +227,75 @@ describe("sale transaction against secure Firestore rules", () => {
     expect(finalStore.shifts[0].status).toBe("closed");
   });
 
+  it("allows only one same-day morning shift when two devices open together", async () => {
+    const a = env.authenticatedContext("cashier-a").firestore();
+    const b = env.authenticatedContext("cashier-b").firestore();
+    const morning = { defId: "shift_morning", name: "กะเช้า", status: "active",
+      businessDate: "2026-10-07", startTime: "2026-10-07T00:59:00Z", endTime: null };
+    const results = await Promise.allSettled([
+      saveOperation(a, { kind: "startShift", shift: { ...morning, id: "morning-a" }, expectedActiveId: null }),
+      saveOperation(b, { kind: "startShift", shift: { ...morning, id: "morning-b" }, expectedActiveId: null }),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.find((result) => result.status === "rejected").reason.message)
+      .toBe("SHIFT_ALREADY_EXISTS");
+    const finalStore = (await a.doc(STORE_PATH).get()).data();
+    expect(finalStore.shifts).toHaveLength(1);
+    expect(finalStore.shifts[0].status).toBe("active");
+    expect(finalStore.revision).toBe(1);
+    expect(finalStore.products).toEqual(store().products);
+    expect(finalStore.transactions).toEqual([]);
+  });
+
+  it("rejects reopening a closed same-day shift without closing another active shift", async () => {
+    const morning = { id: "morning", defId: "shift_morning", name: "กะเช้า",
+      businessDate: "2026-10-07", status: "closed", startTime: "2026-10-07T00:59:00Z" };
+    const afternoon = { id: "afternoon", defId: "shift_afternoon", name: "กะบ่าย",
+      businessDate: "2026-10-07", status: "active", startTime: "2026-10-07T10:01:00Z" };
+    await env.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().doc(STORE_PATH).update({ shifts: [morning, afternoon] });
+    });
+    const device = env.authenticatedContext("cashier-a").firestore();
+    await expect(saveOperation(device, { kind: "startShift",
+      shift: { ...morning, id: "duplicate", status: "active" }, expectedActiveId: afternoon.id,
+      endTime: "2026-10-07T11:00:00Z" })).rejects.toThrow("SHIFT_ALREADY_EXISTS");
+    const finalStore = (await device.doc(STORE_PATH).get()).data();
+    expect(finalStore.shifts).toEqual([morning, afternoon]);
+    expect(finalStore.revision).toBe(0);
+  });
+
+  it("allows other shift types on the same day and the morning shift on the next day", async () => {
+    const device = env.authenticatedContext("cashier-a").firestore();
+    const morning = { id: "morning", defId: "shift_morning", name: "กะเช้า",
+      businessDate: "2026-10-07", status: "active", startTime: "2026-10-07T00:59:00Z" };
+    const afternoon = { ...morning, id: "afternoon", defId: "shift_afternoon", name: "กะบ่าย" };
+    const nextMorning = { ...morning, id: "next-morning", businessDate: "2026-10-08" };
+    const open = (shift, activeId) => saveOperation(device, { kind: "startShift", shift,
+      expectedActiveId: activeId, endTime: shift.startTime });
+    await open(morning, null);
+    await open(morning, null); // Retrying the identical record is still idempotent.
+    await open(afternoon, morning.id);
+    await open(nextMorning, afternoon.id);
+    const finalStore = (await device.doc(STORE_PATH).get()).data();
+    expect(finalStore.shifts.map((shift) => shift.id)).toEqual(["morning", "afternoon", "next-morning"]);
+    expect(finalStore.shifts.map((shift) => shift.status)).toEqual(["closed", "closed", "active"]);
+    expect(finalStore.revision).toBe(3);
+  });
+
+  it("recognizes a legacy morning shift without a definition ID or stored business date", async () => {
+    const legacy = { id: "legacy", name: "กะเช้า", status: "closed",
+      startTime: new Date(2026, 9, 7, 7, 59).toISOString() };
+    await env.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().doc(STORE_PATH).update({ shifts: [legacy] });
+    });
+    const device = env.authenticatedContext("cashier-a").firestore();
+    await expect(saveOperation(device, { kind: "startShift", expectedActiveId: null,
+      shift: { id: "duplicate", defId: "shift_morning", name: "กะเช้า", status: "active",
+        businessDate: "2026-10-07", startTime: legacy.startTime } }))
+      .rejects.toThrow("SHIFT_ALREADY_EXISTS");
+    expect((await device.doc(STORE_PATH).get()).data().shifts).toEqual([legacy]);
+  });
+
   it("merges independent settings but rejects two checks for the same date", async () => {
     const admin = env.authenticatedContext("admin-a").firestore();
     const cashier = env.authenticatedContext("cashier-a").firestore();

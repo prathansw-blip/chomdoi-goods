@@ -14,6 +14,7 @@ import {
   getSyncStatus,
 } from "../data/store.js";
 import { isAdmin, getCurrentUser } from "../utils/auth.js";
+import { hasShiftForBusinessDate } from "../data/shifts.js";
 import {
   generateId,
   formatCurrency,
@@ -202,7 +203,7 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
 
   // Today's shifts summary
   const todayShifts = getShifts().filter((s) => {
-    const bd = getBusinessDate(s.startTime, startHour);
+    const bd = s.businessDate || getBusinessDate(s.startTime, startHour);
     return bd === todayBiz;
   });
   const todayTxns = transactions.filter((t) => {
@@ -235,17 +236,19 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
           !active
             ? shiftDefs
                 .map(
-                  (def) => `
-              <button class="btn btn-success btn-start-shift" data-def-id="${def.id}">
-                ${def.icon} เปิด${def.name} (${formatHour(def.startHour)}-${formatHour(def.endHour)})
-              </button>
-            `,
+                  (def) => {
+                    const opened = hasShiftForBusinessDate(todayShifts, def, todayBiz, startHour);
+                    return `
+              <button class="btn ${opened ? "btn-outline" : "btn-success"} btn-start-shift" data-def-id="${def.id}" ${opened ? 'disabled title="กะนี้เปิดไปแล้วในวันทำงานนี้"' : ""}>
+                ${def.icon} ${opened ? `${def.name} — เปิดแล้ววันนี้` : `เปิด${def.name} (${formatHour(def.startHour)}-${formatHour(def.endHour)})`}
+              </button>`;
+                  },
                 )
                 .join("")
             : `<button class="btn btn-danger" id="btn-close-shift">🔴 ปิด${active.name}</button>`
         }
       </div>
-      ${!active ? `<div style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-muted)">💡 แนะนำ: ตอนนี้ควรเปิด <strong style="color:var(--gold)">${currentDef?.icon} ${currentDef?.name}</strong></div>` : ""}
+      ${!active ? `<div style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-muted)">กะชนิดเดียวกันเปิดได้ครั้งเดียวต่อวันทำงาน (${formatBusinessDate(todayBiz)})${currentDef && !hasShiftForBusinessDate(todayShifts, currentDef, todayBiz, startHour) ? `<br>💡 แนะนำ: ตอนนี้ควรเปิด <strong style="color:var(--gold)">${currentDef.icon} ${currentDef.name}</strong>` : ""}</div>` : ""}
       ${isAdmin() ? `<div style="margin-top:0.75rem"><button class="btn btn-outline" id="btn-send-daily-summary" style="font-size:0.85rem">📋 ส่งสรุปยอดวันนี้ทาง LINE</button></div>` : ""}
     </div>
 
@@ -335,7 +338,7 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
   }
 
   // Events: start shift
-  el.querySelectorAll(".btn-start-shift").forEach((btn) => {
+  el.querySelectorAll(".btn-start-shift:not([disabled])").forEach((btn) => {
     btn.onclick = () => {
       const defId = btn.dataset.defId;
       const def = shiftDefs.find((d) => d.id === defId);

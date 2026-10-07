@@ -65,7 +65,9 @@ export function showToast(message, type = "success", duration = 3000) {
 export function showWriteError(error) {
   const message = String(error?.message || "");
   let visibleMessage;
-  if (message.startsWith("SYNC_CONFLICT")) {
+  if (message.startsWith("SHIFT_ALREADY_EXISTS")) {
+    visibleMessage = "กะนี้เปิดไปแล้วในวันทำงานนี้ ไม่สามารถสร้างกะซ้ำได้";
+  } else if (message.startsWith("SYNC_CONFLICT")) {
     visibleMessage = "ข้อมูลเปลี่ยนจากเครื่องอื่น กรุณาเปิดหน้าล่าสุดแล้วลองอีกครั้ง";
   } else if (error?.code === "permission-denied") {
     visibleMessage = "บัญชีนี้ไม่มีสิทธิ์บันทึกรายการนี้";
