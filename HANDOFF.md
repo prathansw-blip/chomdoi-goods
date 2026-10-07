@@ -1,17 +1,21 @@
 # Chomdoi Goods — คู่มือรับช่วงงาน
 
-อัปเดต: 29 กันยายน 2026 ระบบ Production ใช้ build จาก application commit `47f6571` หลังเพิ่มตัวเลขเฉียง 45° และปุ่มแสดง/ซ่อนบนกราฟยอดขายรายปี พร้อมแก้การจัดวางหน้าประวัติบนมือถือ เผยแพร่เฉพาะ Firebase Hosting เวลา 03:36 น. ไทย รุ่นนี้รวมกราฟยอดขายรายปี, dependency security patch และ login logo fix ก่อนหน้าด้วย โฟลว์ login, การกรอกข้อมูลธุรกิจ, โครงสร้างข้อมูล และ secure Rules ไม่เปลี่ยนจากรุ่น cutover `22370b5` ที่เจ้าของยืนยันว่า admin เข้าได้และสต็อกตรงกันทุกเครื่อง
+อัปเดต: 8 ตุลาคม 2026 ระบบ Production ใช้ build จาก application commit `0d4159a` หลังเพิ่มการป้องกันกะชนิดเดียวกันซ้ำในวันทำงานเดียวกัน เผยแพร่เฉพาะ Firebase Hosting เวลา 01:12 น. ไทย รุ่นนี้รวมกราฟยอดขายรายปี, dependency security patch และ login logo fix ก่อนหน้าด้วย ไม่มีการอ่านหรือเขียนข้อมูล Firestore Production ในรอบแก้นี้ กะซ้ำเดิมไม่ได้ลบหรือรวม และ secure Rules ไม่เปลี่ยน
+
+การป้องกันกะซ้ำตรวจ `defId` หรือชื่อกะร่วมกับ `businessDate` ทั้งในหน้าจอและใน transaction ที่อ่านข้อมูลร้านล่าสุดก่อนบันทึก กะที่ปิดแล้วก็ห้ามสร้างซ้ำในวันทำงานนั้น; กะชนิดอื่นและวันถัดไปเปิดได้ กะเก่าที่ไม่มี `businessDate` ใช้การคำนวณวันทำงานเดิมจาก `startTime` ปุ่มกะที่เปิดแล้วถูก disable และกรณีชนกันจากหลายเครื่องแสดงข้อความภาษาไทย การ retry ด้วย ID เดิมยังไม่สร้างรายการเพิ่ม ทดสอบ Emulator ผ่าน 49/49 รวมเปิดกะพร้อมกันสองเครื่อง เปิดซ้ำหลังปิดกะ และกะเก่าที่ไม่มี definition/date; build ผ่านพร้อมคำเตือน chunk เกิน 500 kB ตามเดิม Chrome UI จำลองยืนยันปุ่มปิดใช้งานแล้ว ภาพอยู่ที่ `/Users/keng/.codex/backups/chomdoi-house/duplicate-shift-2026-10-08-demo.png`
+
+Hosting รุ่น `c4885705842fe54b` / release `1791396732824000` เผยแพร่เวลา `2026-10-07T18:12:12.824Z` (8 ตุลาคม 01:12:12 ไทย) ตรวจไฟล์สาธารณะ 6 ไฟล์และ SPA rewrite ตรงกับ build สำรองเว็บก่อน/หลังและ rollback อยู่ที่ `/Users/keng/.codex/backups/chomdoi-house/duplicate-shift-2026-10-08/`; ย้อนเฉพาะ Hosting ไป `e13f37af66fb93d6` ได้ ไม่ต้องกู้ Firestore กฎ Firestore ไม่ได้เพิ่มข้อบังคับ uniqueness ฝั่ง server จึงต้องรีเฟรชเว็บทุกเครื่องเพื่อใช้การตรวจของ client รุ่นใหม่ การลบกะจาก admin ยังคงพฤติกรรมเดิมและต้องใช้ด้วยความระวัง เพราะลบรายการขายที่ผูกกับกะและคืนสต็อก
 
 ## เริ่มจากตรงไหน
 
 | รายการ | สถานะ |
 | --- | --- |
 | Repository | `https://github.com/prathansw-blip/chomdoi-goods` |
-| `main` / `origin/main` | รวมรุ่นที่ใช้งานจริงและกราฟยอดขายรายปีพร้อมตัวเลขบนแท่งแล้ว; ตรวจ `git log -1` สำหรับ commit ล่าสุด; application commit ที่ deploy คือ `47f6571` |
+| `main` / `origin/main` | รวมการป้องกันกะซ้ำแล้ว; ตรวจ `git log -1` สำหรับ commit ล่าสุด; application commit ที่ deploy คือ `0d4159a` |
 | `codex/secure-sync-prep` | เก็บประวัติงาน cutover; มี Firebase Auth, transaction สำหรับหลายเครื่อง, กฎ staff และ Emulator tests |
 | Checkout หลักบนเครื่องนี้ | `/Users/keng/Documents/AI Project/Chomdoi Goods - Codex` อยู่บน `main` |
 | Worktree ประวัติ cutover | `/Users/keng/.codex/worktrees/chomdoi-emulator-tests/Chomdoi Goods - Codex` อยู่บน `codex/secure-sync-prep` |
-| สถานะ release | Cutover Hosting และ secure Rules เมื่อ 26 กันยายน 2026; เจ้าของยืนยัน admin เข้าได้และสต็อกตรงทุกเครื่อง; ตัวเลขบนกราฟยอดขายรายปี deploy เฉพาะ Hosting เมื่อ 29 กันยายน 2026 เวลา 03:36 น. ไทย |
+| สถานะ release | การป้องกันกะซ้ำ deploy เฉพาะ Hosting เมื่อ 8 ตุลาคม 2026 เวลา 01:12 น. ไทย; รีเฟรชเว็บทุกเครื่องเพื่อใช้รุ่นใหม่ |
 
 เริ่มงานพัฒนาต่อจาก `main` ที่ checkout หลักข้างต้น หรือสร้าง branch `codex/<ชื่องาน>` จาก `main` สำหรับงานใหม่ ตรวจ branch ด้วย `git status -sb` ก่อนแก้ไฟล์ เอกสาร HANDOFF รุ่นก่อน cutover ที่เคยค้างใน checkout หลักเก็บไว้ใน Git stash ชื่อ `Preserve pre-cutover local handoff before main fast-forward` และตรงกับเอกสารที่มีอยู่ในประวัติ Git แล้ว ไฟล์ cache ของ Firebase CLI และ `.serena/` เป็นข้อมูลเฉพาะเครื่องและถูก ignore
 

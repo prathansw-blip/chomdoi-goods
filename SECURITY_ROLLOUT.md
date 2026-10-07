@@ -119,6 +119,14 @@ Application commit `47f6571` draws 45° paid-sales value labels above annual cha
 
 Hosting-only deployment completed at `2026-09-28T20:36:12.566Z` (03:36:12 Bangkok, 29 September 2026), release `1790627772566000`, version `e13f37af66fb93d6`. Public HTTP requests confirmed SHA256 equality for all six built files and the SPA rewrite. The backup `/Users/keng/.codex/backups/chomdoi-house/year-chart-labels-2026-09-29/` contains the previous public files, candidate build, manifest, release metadata, verification results and rollback instructions. If needed, roll Hosting back to retained version `f6a376d24dc961e9`, release `1790627219187000`; no Firestore restore or Rules change is needed.
 
+## Duplicate shift prevention (8 October 2026; Hosting only)
+
+Application commit `0d4159a` checks the latest store inside the existing revision transaction before opening a shift. A matching definition ID or name on the same business date is rejected with `SHIFT_ALREADY_EXISTS`, including closed shifts. Rejected opens do not close an active shift or modify business records. The UI disables already-opened shift buttons and uses stored business dates when listing today's shifts. Legacy shifts without a stored date use the existing business-date calculation. Same-ID retries remain idempotent. Other shift types and the next business date remain allowed.
+
+49/49 local Emulator tests and the production build passed; Chrome UI verification used synthetic data only. Concurrent opens from two authenticated clients produced one active shift and one duplicate error. No Production Firestore data, Auth, Rules or LINE settings were read or changed, and existing duplicate shifts were preserved. The existing chunk-size warning remains.
+
+Hosting release `1791396732824000`, version `c4885705842fe54b`, was published at `2026-10-07T18:12:12.824Z` (8 October 2026, 01:12:12 Bangkok). Public HTTP verification matched all six build files and the SPA rewrite. Backup and rollback evidence: `/Users/keng/.codex/backups/chomdoi-house/duplicate-shift-2026-10-08/`. Roll back Hosting only to retained version `e13f37af66fb93d6`, release `1790627772566000`, if needed; no database restore is required. This restores the previous duplicate-opening behavior. All devices must refresh to use the new client; existing Rules do not independently enforce shift uniqueness against older clients or custom writes.
+
 ## Preparation and Emulator evidence (before deployment)
 
 - The owner approved five staff roles. Five `/staff/{uid}` records were created atomically in Production and verified by reading them back; six unmatched Auth accounts have no staff record. The store document, Auth accounts, deployed Rules and Hosting were not changed. A post-write encrypted backup including staff was verified on this Mac.
