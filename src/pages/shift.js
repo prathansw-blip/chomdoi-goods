@@ -296,7 +296,7 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
           <table class="table">
             <thead><tr><th>สินค้า</th><th>จำนวน</th><th>ยอดรวม</th></tr></thead>
             <tbody>
-              ${sortedItems.map(([name, data]) => `<tr><td>${name}</td><td>${data.qty} ชิ้น</td><td>${formatCurrency(data.total, currency)}</td></tr>`).join("")}
+              ${sortedItems.map(([name, data]) => `<tr><td>${escapeHtml(name)}${renderItemSaleDetails(name, shiftTxns, currency)}</td><td>${data.qty} ชิ้น</td><td>${formatCurrency(data.total, currency)}</td></tr>`).join("")}
             </tbody>
           </table>
         </div>
@@ -1129,6 +1129,34 @@ function buildYearChart(monthlySales, year, selectedMonthIndex, currency) {
   });
 }
 
+// Read-only bill details: preserve the names and prices captured at sale time.
+function renderItemSaleDetails(name, transactions, currency) {
+  const products = getProducts();
+  const lines = transactions.flatMap((txn) => (txn.items || [])
+    .filter((item) => item.name === name)
+    .map((item) => ({ txn, item })));
+  const methods = { cash: "เงินสด", transfer: "โอน", free: "ฟรี" };
+  return `<details class="item-sale-details">
+    <summary style="color:var(--gold);cursor:pointer;min-height:44px;display:flex;align-items:center;gap:0.4rem;font-weight:600" aria-label="ดูรายการขาย ${escapeHtml(name)}">
+      <span aria-hidden="true">▸</span> ดูรายการขาย
+    </summary>
+    <div style="min-width:240px;padding:0.5rem 0;font-size:0.85rem">
+      ${lines.map(({ txn, item }) => {
+        const current = products.find((p) => p.id === item.productId);
+        return `<div style="padding:0.65rem 0;border-top:1px solid var(--border)">
+          <strong>${escapeHtml(item.name)}</strong> × ${item.qty} ชิ้น
+          ${current && current.name !== item.name ? `<div style="color:var(--text-muted)">ชื่อปัจจุบัน: ${escapeHtml(current.name)}</div>` : ""}
+          <div style="color:var(--text-secondary);margin-top:0.25rem">${formatDateTime(txn.timestamp)} · ${methods[txn.paymentMethod] || "ไม่ระบุ"}</div>
+          <div>ชิ้นละ ${formatCurrency(item.price, currency)} · รวม ${formatCurrency(item.subtotal, currency)}</div>
+          <div style="color:var(--text-muted);overflow-wrap:anywhere;margin-top:0.25rem">บิล: ${escapeHtml(txn.id)}</div>
+          ${txn.paymentMethod === "free" && txn.freeReason ? `<div style="color:var(--text-muted)">เหตุผล: ${escapeHtml(txn.freeReason)}</div>` : ""}
+        </div>`;
+      }).join("")}
+      <div style="color:var(--text-muted);margin-top:0.5rem">ชื่อและราคาอ้างอิงจากบิลตอนขาย</div>
+    </div>
+  </details>`;
+}
+
 function drawDayDetail(el, date, settings, currency) {
   const transactions = getTransactions();
   const shifts = getShifts();
@@ -1219,7 +1247,7 @@ function drawDayDetail(el, date, settings, currency) {
                 <tbody>${sSorted
                   .map(
                     ([name, data]) => `<tr>
-                  <td>${name}</td>
+                  <td>${escapeHtml(name)}${renderItemSaleDetails(name, sTxns, currency)}</td>
                   <td>${data.qty}</td>
                   <td>${data.cash > 0 ? formatCurrency(data.cash, currency) : "—"}</td>
                   <td>${data.transfer > 0 ? formatCurrency(data.transfer, currency) : "—"}</td>
@@ -1249,7 +1277,7 @@ function drawDayDetail(el, date, settings, currency) {
           <table class="table">
             <thead><tr><th>สินค้า</th><th>จำนวนรวม</th><th>ยอดรวม</th></tr></thead>
             <tbody>
-              ${sortedItems.map(([name, data]) => `<tr><td>${name}</td><td>${data.qty} ชิ้น</td><td style="color:var(--gold);font-weight:600">${formatCurrency(data.total, currency)}</td></tr>`).join("")}
+              ${sortedItems.map(([name, data]) => `<tr><td>${escapeHtml(name)}${renderItemSaleDetails(name, dayTxns, currency)}</td><td>${data.qty} ชิ้น</td><td style="color:var(--gold);font-weight:600">${formatCurrency(data.total, currency)}</td></tr>`).join("")}
             </tbody>
           </table>
         </div>

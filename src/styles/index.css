@@ -1601,3 +1601,8 @@ body.modal-open .page-content {
     padding: 1rem;
   }
 }
+
+/* Keep summary values aligned while bill details are expanded. */
+.table tr:has(.item-sale-details) td { vertical-align: top; }
+.item-sale-details[open] > summary > span { transform: rotate(90deg); }
+.item-sale-details summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
