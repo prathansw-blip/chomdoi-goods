@@ -1,6 +1,7 @@
 // Apply one user action to the latest Firestore document inside a transaction.
 // Return only the top-level fields changed by that action.
 import { hasShiftForBusinessDate } from "./shifts.js";
+import { getBusinessDate } from "../utils/utils.js";
 function same(left, right) {
   if (Object.is(left, right)) return true;
   if (Array.isArray(left) || Array.isArray(right)) {
@@ -46,7 +47,7 @@ function existingById(items, id) {
   return (items || []).find((item) => item.id === id);
 }
 
-export function applyStoreOperation(store, operation) {
+export function applyStoreOperation(store, operation, actor = null) {
   const op = operation || {};
   switch (op.kind) {
     case "setProductStock": {
@@ -136,6 +137,43 @@ export function applyStoreOperation(store, operation) {
       const closed = { ...current, status: "closed", endTime: op.endTime };
       if (op.closedBy) closed.closedBy = op.closedBy;
       return { shifts: store.shifts.map((item) => item.id === op.shiftId ? closed : item) };
+    }
+    case "correctShiftType": {
+      if (!actor?.uid || actor.active !== true || actor.role !== "admin") {
+        throw new Error("ADMIN_REQUIRED");
+      }
+      const definition = store.settings?.shiftDefinitions?.find((item) => item.id === op.defId);
+      const reason = typeof op.reason === "string" ? op.reason.trim() : "";
+      if (!definition?.name || !op.correctionId || !reason || reason.length > 300
+        || !Number.isFinite(Date.parse(op.correctedAt))) throw new Error("INVALID_SHIFT_CORRECTION");
+      const history = store.shiftCorrections || [];
+      const previous = history.find((entry) => entry.id === op.correctionId);
+      if (previous) {
+        if (previous.shiftId === op.shiftId && previous.after.defId === op.defId
+          && previous.by.uid === actor.uid && previous.reason === reason) return null;
+        conflict();
+      }
+      const current = existingById(store.shifts, op.shiftId);
+      if (!current) throw new Error("SHIFT_NOT_FOUND");
+      if (!same(current, op.expected)) conflict();
+      if (current.defId === definition.id && current.name === definition.name) return null;
+      const date = current.businessDate || getBusinessDate(current.startTime,
+        store.settings?.businessDayStartHour ?? 8);
+      if (hasShiftForBusinessDate(store.shifts.filter((item) => item.id !== current.id),
+        definition, date, store.settings?.businessDayStartHour ?? 8)) {
+        throw new Error("SHIFT_ALREADY_EXISTS");
+      }
+      const after = { defId: definition.id, name: definition.name, icon: definition.icon || "⏰" };
+      return {
+        shifts: store.shifts.map((item) => item.id === current.id ? { ...item, ...after } : item),
+        // This field is admin-only under existing Rules; staff writes cannot submit this operation.
+        shiftCorrections: [...history, {
+          id: op.correctionId, shiftId: current.id, businessDate: date,
+          before: { defId: current.defId || null, name: current.name || "", icon: current.icon || null },
+          after, reason, correctedAt: op.correctedAt,
+          by: { uid: actor.uid, displayName: actor.displayName || actor.username || actor.uid },
+        }],
+      };
     }
     case "deleteShift": {
       const current = existingById(store.shifts, op.shiftId);

@@ -125,7 +125,13 @@ export async function saveMutation(operation) {
     const snap = await transaction.get(ref);
     if (!snap.exists()) throw new Error("Store document is missing");
     const store = publicStore(snap.data());
-    const changes = applyStoreOperation(store, operation);
+    let actor = null;
+    if (operation.kind === "correctShiftType") {
+      const uid = auth.currentUser.uid;
+      const staff = await transaction.get(doc(firestore, "staff", uid));
+      actor = staff.exists() ? { ...staff.data(), uid } : null;
+    }
+    const changes = applyStoreOperation(store, operation, actor);
     if (!changes) return store;
     const revision = store.revision + 1;
     transaction.update(ref, { ...changes, revision });

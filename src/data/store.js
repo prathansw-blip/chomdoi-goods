@@ -249,6 +249,12 @@ export function deleteShift(shiftId, displayedShift, displayedTransactions) {
     expectedTransactions: structuredClone(expectedTransactions) });
 }
 
+export function correctShiftType(shiftId, defId, reason, displayedShift) {
+  return mutate("correctShiftType", { shiftId, defId, reason,
+    expected: structuredClone(displayedShift),
+    correctionId: crypto.randomUUID(), correctedAt: new Date().toISOString() });
+}
+
 // Settings
 export function updateSettings(updates, displayedSettings) {
   return mutate("updateSettings", { updates: structuredClone(updates),

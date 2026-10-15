@@ -7,6 +7,8 @@ import {
   startShift,
   closeShift,
   deleteShift,
+  correctShiftType,
+  getState,
   deleteTransaction,
   subscribe,
   getSettings,
@@ -274,7 +276,7 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
               <td>${formatCurrency(sPb.transfer, currency)}</td>
               <td>${sPb.free > 0 ? formatCurrency(sPb.free, currency) : "—"}</td>
               <td><button class="btn-view-bills" data-sid="${s.id}" data-sname="${s.name}" style="background:none;border:1px solid var(--border);color:var(--gold);font-weight:700;font-size:0.9rem;padding:0.25rem 0.7rem;border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition);font-family:'Inter',sans-serif" title="กดเพื่อดูรายละเอียด">${sTxns.length} 🧾</button></td>
-              ${isAdmin() ? `<td><button class="btn btn-outline btn-del-shift" data-sid="${s.id}" data-sname="${s.name}" data-stotal="${sTotal}" data-sbills="${sTxns.length}" style="padding:0.2rem 0.5rem;font-size:0.75rem;color:var(--red)" title="ลบกะนี้">🗑️</button></td>` : ""}
+              ${isAdmin() ? `<td>${shiftEditButton(s)} <button class="btn btn-outline btn-del-shift" data-sid="${s.id}" data-sname="${s.name}" data-stotal="${sTotal}" data-sbills="${sTxns.length}" style="padding:0.2rem 0.5rem;font-size:0.75rem;color:var(--red)" title="ลบกะนี้">🗑️</button></td>` : ""}
             </tr>`;
             })
             .join("")}
@@ -526,6 +528,8 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
       };
     };
   }
+
+  bindShiftEditors(el, () => draw(el.closest(".page-content")));
 
   // Event: delete shift (admin only)
   el.querySelectorAll(".btn-del-shift").forEach((btn) => {
@@ -1129,6 +1133,99 @@ function buildYearChart(monthlySales, year, selectedMonthIndex, currency) {
   });
 }
 
+function shiftEditButton(shift) {
+  return `<button class="btn btn-outline btn-edit-shift" data-sid="${escapeHtml(shift.id)}"
+    style="min-height:44px;margin:0.2rem;font-size:0.8rem"
+    aria-label="แก้ไขชนิดกะ ${escapeHtml(shift.name)}">แก้ไขกะ</button>`;
+}
+
+function bindShiftEditors(el, refresh) {
+  el.querySelectorAll(".btn-edit-shift").forEach((button) => {
+    button.onclick = () => {
+      if (!isAdmin()) return;
+      const shift = structuredClone(getShifts().find((s) => s.id === button.dataset.sid));
+      if (!shift) return;
+      const settings = getSettings();
+      const date = shift.businessDate || getBusinessDate(shift.startTime, settings.businessDayStartHour ?? 8);
+      const definitions = settings.shiftDefinitions || [];
+      const others = getShifts().filter((s) => s.id !== shift.id);
+      const logs = (getState().shiftCorrections || []).filter((entry) => entry.shiftId === shift.id);
+      const overlay = document.createElement("div");
+      overlay.className = "modal-overlay";
+      overlay.innerHTML = `
+        <form class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-shift-title" style="max-width:480px;max-height:90vh;overflow-y:auto">
+          <h2 class="modal-title" id="edit-shift-title">แก้ไขชนิดกะ</h2>
+          <p>${escapeHtml(shift.name)} · ${formatBusinessDate(date)}</p>
+          <p style="color:var(--text-secondary);margin:0.5rem 0 1rem">${formatTime(shift.startTime)} → ${shift.endTime ? formatTime(shift.endTime) : "ยังเปิดอยู่"}</p>
+          <p style="color:var(--green);margin-bottom:1rem">เปลี่ยนเฉพาะชนิดกะ บิล ยอดขาย เวลา และสต็อกคงเดิม</p>
+          <div class="form-group">
+            <label class="form-label" for="edit-shift-type">เปลี่ยนเป็น</label>
+            <select class="form-input" id="edit-shift-type" required>
+              <option value="">เลือกชนิดกะที่ถูกต้อง</option>
+              ${definitions.map((def) => {
+                const used = hasShiftForBusinessDate(others, def, date, settings.businessDayStartHour ?? 8);
+                const current = shift.defId === def.id || (!shift.defId && shift.name === def.name);
+                return `<option value="${escapeHtml(def.id)}" ${used || current ? "disabled" : ""}>${escapeHtml(def.name)}${used ? " — มีแล้วในวันทำงานนี้" : current ? " — กะเดิม" : ""}</option>`;
+              }).join("")}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit-shift-reason">เหตุผลที่แก้ไข</label>
+            <textarea class="form-input" id="edit-shift-reason" maxlength="300" rows="2" required placeholder="เช่น เลือกกะดึกผิด ต้องเป็นกะบ่าย"></textarea>
+          </div>
+          <p id="edit-shift-error" role="alert" style="color:var(--red)"></p>
+          ${logs.length ? `<details style="margin-top:0.75rem"><summary>ประวัติการแก้ไข (${logs.length})</summary>${logs.map((entry) =>
+            `<p style="font-size:0.85rem;margin-top:0.5rem">${escapeHtml(entry.before.name)} → ${escapeHtml(entry.after.name)}<br>
+              ${escapeHtml(entry.by.displayName)} · ${formatDateTime(entry.correctedAt)}<br>${escapeHtml(entry.reason)}</p>`).join("")}</details>` : ""}
+          <div class="modal-actions">
+            <button class="btn btn-outline" type="button" id="edit-shift-cancel">ยกเลิก</button>
+            <button class="btn btn-primary" type="submit" id="edit-shift-save">บันทึกการแก้ไขกะ</button>
+          </div>
+        </form>`;
+      document.body.appendChild(overlay);
+      const form = overlay.querySelector("form");
+      const select = overlay.querySelector("#edit-shift-type");
+      const reason = overlay.querySelector("#edit-shift-reason");
+      const cancel = overlay.querySelector("#edit-shift-cancel");
+      const save = overlay.querySelector("#edit-shift-save");
+      let saving = false;
+      const close = () => { if (!saving) { overlay.remove(); button.focus(); } };
+      cancel.onclick = close;
+      overlay.onclick = (event) => { if (event.target === overlay) close(); };
+      overlay.onkeydown = (event) => {
+        if (event.key === "Escape") { event.preventDefault(); close(); }
+        if (event.key === "Tab") {
+          const fields = [...form.querySelectorAll("button:not([disabled]), select, textarea, summary")];
+          const first = fields[0], last = fields[fields.length - 1];
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }
+      };
+      form.onsubmit = async (event) => {
+        event.preventDefault();
+        if (saving) return;
+        if (!reason.value.trim()) { reason.focus(); return; }
+        saving = true;
+        save.disabled = cancel.disabled = true;
+        save.textContent = "กำลังบันทึก...";
+        try {
+          await correctShiftType(shift.id, select.value, reason.value.trim(), shift);
+          overlay.remove();
+          showToast("แก้ไขชนิดกะแล้ว บิลและสต็อกคงเดิม", "success");
+          refresh();
+          el.querySelector(".btn-edit-shift")?.focus();
+        } catch (error) {
+          overlay.querySelector("#edit-shift-error").textContent = showWriteError(error);
+          saving = false;
+          save.disabled = cancel.disabled = false;
+          save.textContent = "บันทึกการแก้ไขกะ";
+        }
+      };
+      select.focus();
+    };
+  });
+}
+
 // Read-only bill details: preserve the names and prices captured at sale time.
 function renderItemSaleDetails(name, transactions, currency) {
   const products = getProducts();
@@ -1236,6 +1333,7 @@ function drawDayDetail(el, date, settings, currency) {
               <div style="text-align:right">
                 <span style="color:var(--gold);font-weight:700;font-size:1.1rem">${formatCurrency(sTotal, currency)}</span>
                 <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem">${sTxns.length} bills</span>
+                ${isAdmin() ? shiftEditButton(s) : ""}
               </div>
             </div>
             ${
@@ -1291,6 +1389,8 @@ function drawDayDetail(el, date, settings, currency) {
         : ""
     }
   `;
+
+  bindShiftEditors(el, () => drawDayDetail(el, date, getSettings(), currency));
 
   // Chart for the day
   if (dayTxns.length > 0) buildChart(dayTxns);

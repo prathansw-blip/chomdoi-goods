@@ -88,12 +88,17 @@ async function saveRestock(db, log) {
   }));
 }
 
-async function saveOperation(db, operation) {
+async function saveOperation(db, operation, uid = null) {
   const ref = db.doc(STORE_PATH);
   return retryRevisionTransaction(() => db.runTransaction(async (transaction) => {
     const snap = await transaction.get(ref);
     const current = snap.data();
-    const changes = applyStoreOperation(current, operation);
+    let actor = null;
+    if (operation.kind === "correctShiftType" && uid) {
+      const staff = await transaction.get(db.doc(`staff/${uid}`));
+      actor = staff.exists ? { ...staff.data(), uid } : null;
+    }
+    const changes = applyStoreOperation(current, operation, actor);
     if (changes) transaction.update(ref, { ...changes, revision: current.revision + 1 });
   }));
 }
@@ -354,5 +359,88 @@ describe("sale transaction against secure Firestore rules", () => {
     const finalStore = (await a.doc(STORE_PATH).get()).data();
     expect(finalStore.supplyRestocks.map((item) => item.id).sort())
       .toEqual(["supply-restock-a", "supply-restock-b"]);
+  });
+});
+
+describe("admin shift corrections without stock changes", () => {
+  const night = { id: "shift-wrong-night", defId: "night", name: "กะดึก", icon: "🌙",
+    businessDate: "2026-10-15", startTime: "2026-10-15T09:59:00Z",
+    endTime: "2026-10-15T17:01:00Z", status: "closed", closedBy: { id: "employee" } };
+  const definitions = [{ id: "morning", name: "กะเช้า", icon: "🌅" },
+    { id: "afternoon", name: "กะบ่าย", icon: "🌇" }, { id: "night", name: "กะดึก", icon: "🌙" }];
+  const correction = (expected = night, extra = {}) => ({ kind: "correctShiftType",
+    shiftId: night.id, defId: "afternoon", reason: "เลือกชนิดกะผิด",
+    expected, correctionId: "correction-1", correctedAt: "2026-10-16T01:00:00Z", ...extra });
+  async function seed(extra = {}) {
+    const initial = { ...store(), shifts: [night],
+      settings: { shiftDefinitions: definitions, businessDayStartHour: 8 },
+      transactions: [{ id: "existing-sale", shiftId: night.id,
+        businessDate: "2026-10-15", paymentMethod: "cash", total: 220,
+        items: [{ productId: "product-1", name: "Demo", qty: 2, price: 110, subtotal: 220 }] }], ...extra };
+    await env.withSecurityRulesDisabled(ctx => ctx.firestore().doc(STORE_PATH).set(initial));
+    return initial;
+  }
+  it("changes only type and appends audit; keeps every sale, stock, date and closing detail", async () => {
+    const initial = await seed();
+    const db = env.authenticatedContext("admin-a").firestore();
+    const op = correction();
+    await saveOperation(db, op, "admin-a");
+    const after = (await db.doc(STORE_PATH).get()).data();
+    expect(after.shifts).toEqual([{ ...night, defId: "afternoon", name: "กะบ่าย", icon: "🌇" }]);
+    expect(after.products).toEqual(initial.products);
+    expect(after.transactions).toEqual(initial.transactions);
+    expect(after.shiftCorrections).toMatchObject([{ shiftId: night.id,
+      before: { defId: "night" }, after: { defId: "afternoon" },
+      reason: op.reason, by: { uid: "admin-a" } }]);
+    await saveOperation(db, op, "admin-a");
+    expect((await db.doc(STORE_PATH).get()).data()).toEqual(after);
+  });
+  it("rejects a staff correction and Rules reject even a forged admin actor", async () => {
+    const initial = await seed();
+    const db = env.authenticatedContext("cashier-a").firestore();
+    await expect(saveOperation(db, correction(), "cashier-a")).rejects.toThrow("ADMIN_REQUIRED");
+    const forged = applyStoreOperation(initial, correction(), { uid: "admin-a", active: true, role: "admin" });
+    await expect(db.doc(STORE_PATH).update({ ...forged, revision: 1 })).rejects.toHaveProperty("code", "permission-denied");
+    expect((await db.doc(STORE_PATH).get()).data()).toEqual(initial);
+  });
+  it("rejects duplicate target type without changing the original or its bills", async () => {
+    const initial = await seed({ shifts: [night, { ...night, id: "already-afternoon", defId: "afternoon", name: "กะบ่าย" }] });
+    const db = env.authenticatedContext("admin-a").firestore();
+    await expect(saveOperation(db, correction(), "admin-a")).rejects.toThrow("SHIFT_ALREADY_EXISTS");
+    expect((await db.doc(STORE_PATH).get()).data()).toEqual(initial);
+  });
+  it("rejects a stale correction after another device closes the shift", async () => {
+    const active = { ...night, status: "active", endTime: null };
+    await seed({ shifts: [active] });
+    const db = env.authenticatedContext("admin-a").firestore();
+    await saveOperation(db, { kind: "closeShift", shiftId: night.id, endTime: night.endTime });
+    const before = (await db.doc(STORE_PATH).get()).data();
+    await expect(saveOperation(db, correction(active), "admin-a")).rejects.toThrow("SYNC_CONFLICT");
+    expect((await db.doc(STORE_PATH).get()).data()).toEqual(before);
+  });
+  it("corrects an active legacy shift without a stored date and preserves concurrent sales", async () => {
+    const legacy = { ...night, status: "active", endTime: null };
+    delete legacy.businessDate; delete legacy.defId;
+    const initial = await seed({ shifts: [legacy] });
+    const admin = env.authenticatedContext("admin-a").firestore();
+    const cashier = env.authenticatedContext("cashier-a").firestore();
+    await Promise.all([saveOperation(admin, correction(legacy), "admin-a"), saveSale(cashier, sale("new-sale"))]);
+    const after = (await admin.doc(STORE_PATH).get()).data();
+    expect(after.products[0].stock).toBe(initial.products[0].stock - 1);
+    expect(after.transactions).toHaveLength(2);
+    expect(after.transactions[0]).toEqual(initial.transactions[0]);
+    expect(after.shifts[0]).toEqual({ ...legacy, defId: "afternoon", name: "กะบ่าย", icon: "🌇" });
+    expect(after.shiftCorrections[0].businessDate).toBe("2026-10-15");
+  });
+  it("allows exactly one concurrent correction of the same shift", async () => {
+    await seed();
+    const db = env.authenticatedContext("admin-a").firestore();
+    const result = await Promise.allSettled([
+      saveOperation(db, correction(), "admin-a"),
+      saveOperation(db, correction(night, { correctionId: "correction-2", defId: "morning" }), "admin-a"),
+    ]);
+    expect(result.filter(r => r.status === "fulfilled")).toHaveLength(1);
+    expect(result.find(r => r.status === "rejected").reason.message).toContain("SYNC_CONFLICT");
+    expect((await db.doc(STORE_PATH).get()).data().shiftCorrections).toHaveLength(1);
   });
 });

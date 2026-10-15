@@ -67,6 +67,10 @@ export function showWriteError(error) {
   let visibleMessage;
   if (message.startsWith("SHIFT_ALREADY_EXISTS")) {
     visibleMessage = "กะนี้เปิดไปแล้วในวันทำงานนี้ ไม่สามารถสร้างกะซ้ำได้";
+  } else if (message.startsWith("ADMIN_REQUIRED")) {
+    visibleMessage = "เฉพาะ admin เท่านั้นที่แก้ไขชนิดกะได้";
+  } else if (message.startsWith("INVALID_SHIFT_CORRECTION")) {
+    visibleMessage = "กรุณาเลือกชนิดกะและระบุเหตุผลไม่เกิน 300 ตัวอักษร";
   } else if (message.startsWith("SYNC_CONFLICT")) {
     visibleMessage = "ข้อมูลเปลี่ยนจากเครื่องอื่น กรุณาเปิดหน้าล่าสุดแล้วลองอีกครั้ง";
   } else if (error?.code === "permission-denied") {
