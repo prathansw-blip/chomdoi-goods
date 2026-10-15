@@ -1,5 +1,7 @@
 # Chomdoi Goods — คู่มือรับช่วงงาน
 
+Application commit `434b261` เผยแพร่เฉพาะ Firebase Hosting รุ่น `58dfd1f07a297734` เวลา `2026-10-15T17:19:46.909Z` ตรวจไฟล์สาธารณะครบ 6 ไฟล์ตรงกับ build หลัง strict active role check ทดสอบ transaction ซ้ำเฉพาะไฟล์ 22/22 ผ่าน สำรองรุ่นก่อน `e6796cf02e22341d` ไว้แล้ว
+
 อัปเดตล่าสุด 16 ตุลาคม 2026: เพิ่มการแก้ไขชนิดกะโดย admin ผ่านปุ่ม “แก้ไขกะ” ในกะวันนี้และประวัติย้อนหลัง รองรับทั้ง active/closed โดยเปลี่ยนเฉพาะ defId/name/icon บิล, shift ID, วันทำงาน, เวลา, ผู้เปิด/ปิด และ stock คงเดิม ต้องใส่เหตุผล; เพิ่ม audit array `shiftCorrections` ในเอกสารร้านเฉพาะเมื่อบันทึกการแก้ไข ใช้ Rules เดิมที่อนุญาตแก้ field นี้เฉพาะ admin พร้อมอ่าน staff profile ล่าสุดภายใน transaction; ปฏิเสธกะชนิดซ้ำในวันทำงานเดียวกันและ stale edit ไม่เปิดกะที่ปิดแล้วกลับมา และไม่รวมกะเข้าด้วยกัน
 
 ทดสอบ Emulator 55/55 ผ่าน รวมแก้กะโดยบิล/stock คงเดิม, staff/forged actor ถูกปฏิเสธ, กะซ้ำ, stale edit, legacy active shift+ขายพร้อมกัน และแก้พร้อมกันสองเครื่อง Build ผ่าน (คำเตือน chunk >500 kB เดิม) Chrome UI จำลองกะดึก→กะบ่ายยอด 220 สำเร็จและ audit แสดงถูกต้อง ไม่มีการอ่าน/เขียน Firestore Production หรือแก้ Rules; กะผิดในภาพยังไม่ได้แก้จริง ผู้ดูแลต้องทำผ่าน webapp หลัง refresh สำรองเว็บและแนวทาง rollback อยู่ที่ `/Users/keng/.codex/backups/chomdoi-house/shift-correction-2026-10-16/` การย้อน Hosting จะไม่ย้อนข้อมูลกะที่ admin แก้สำเร็จแล้ว; หากต้องการกลับชนิดเดิม ให้ใช้ฟอร์มแก้ไขพร้อมเหตุผลใหม่
