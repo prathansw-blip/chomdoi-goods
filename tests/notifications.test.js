@@ -13,7 +13,7 @@ const line = { enabled: true, channelAccessToken: "synthetic-line-token", target
 const telegram = { enabled: true, botToken: "12345:synthetic-token", chatId: "-10012345", notifications: { dailySummary: true } };
 const quota = { ok: true, quota: { type: "limited", value: 300 }, consumption: { totalUsage: 250 }, month: "2026-10", fetchedAt: "2026-10-31T10:00:00Z" };
 const response = (body, ok = true) => ({ ok, status: ok ? 200 : 401, json: async () => body });
-afterEach(() => { vi.unstubAllGlobals(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("independent report delivery", () => {
   it("still sends Telegram when LINE fails and reports partial success accurately", async () => {
@@ -55,6 +55,56 @@ describe("independent report delivery", () => {
     expect(fetch).toHaveBeenCalledTimes(parts.length);
     expect(fetch.mock.calls[0][1].body.has("allow_paid_broadcast")).toBe(false);
     expect(fetch.mock.calls[0][1].body.has("parse_mode")).toBe(false);
+  });
+});
+
+describe("Telegram explicit rate-limit rejections", () => {
+  const rejection = (seconds, httpStatus = 429) => ({
+    ...response({ ok: false, error_code: 429, parameters: { retry_after: seconds } }, httpStatus === 200),
+    status: httpStatus,
+  });
+  it.each([429, 200])("waits retry_after and retries once for an explicit rejection (HTTP %s)", async (status) => {
+    vi.useFakeTimers();
+    const fetch = vi.fn().mockResolvedValueOnce(rejection(1, status)).mockResolvedValueOnce(response({ ok: true }));
+    vi.stubGlobal("fetch", fetch);
+    const delivery = sendTelegramMessage(telegram, "สรุปกะ");
+    await vi.advanceTimersByTimeAsync(999);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await delivery).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it("does not retry ambiguous network failures, authentication failures, or invalid/excessive waits", async () => {
+    for (const seconds of [undefined, 0, -1, "1", 11]) {
+      const fetch = vi.fn().mockResolvedValue(rejection(seconds)); vi.stubGlobal("fetch", fetch);
+      expect(await sendTelegramMessage(telegram, "test")).toBe(false);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    }
+    const network = vi.fn().mockRejectedValue(new Error("synthetic timeout")); vi.stubGlobal("fetch", network);
+    expect(await sendTelegramMessage(telegram, "test")).toBe(false);
+    expect(network).toHaveBeenCalledTimes(1);
+    const unauthorized = vi.fn().mockResolvedValue(response({ ok: false }, false)); vi.stubGlobal("fetch", unauthorized);
+    expect(await sendTelegramMessage(telegram, "test")).toBe(false);
+    expect(unauthorized).toHaveBeenCalledTimes(1);
+  });
+  it("stops after one retry when Telegram continues rejecting", async () => {
+    vi.useFakeTimers();
+    const fetch = vi.fn().mockResolvedValue(rejection(1)); vi.stubGlobal("fetch", fetch);
+    const delivery = sendTelegramMessage(telegram, "test");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await delivery).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it("retries only the rejected chunk without duplicating earlier accepted chunks", async () => {
+    vi.useFakeTimers();
+    const fetch = vi.fn().mockResolvedValueOnce(response({ ok: true }))
+      .mockResolvedValueOnce(rejection(1)).mockResolvedValueOnce(response({ ok: true }));
+    vi.stubGlobal("fetch", fetch);
+    const delivery = sendTelegramMessage(telegram, "A".repeat(4000) + "B");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await delivery).toBe(true);
+    expect(fetch.mock.calls.map(([, options]) => options.body.get("text")))
+      .toEqual(["A".repeat(4000), "B", "B"]);
   });
 });
 

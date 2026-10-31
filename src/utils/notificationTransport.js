@@ -7,7 +7,12 @@ async function requestJson(url, options) {
   try {
     const response = await fetch(url, { ...options, signal: controller.signal, credentials: "omit" });
     const body = await response.json();
-    if (!response.ok) throw new Error(`PROVIDER_HTTP_${response.status}`);
+    if (!response.ok) {
+      const error = new Error(`PROVIDER_HTTP_${response.status}`);
+      error.status = response.status;
+      if (response.status === 429) error.retryAfter = body.parameters?.retry_after;
+      throw error;
+    }
     return body;
   } finally { clearTimeout(timer); }
 }
@@ -39,14 +44,31 @@ export async function sendTelegramMessage(config, text) {
   if (!config?.enabled || !/^\d+:[A-Za-z0-9_-]+$/.test(config.botToken || "") || !config.chatId) return false;
   try {
     for (const chunk of splitTelegramText(text)) {
-      const data = await requestJson(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
-        method: "POST",
-        body: new URLSearchParams({ chat_id: config.chatId, text: chunk }),
-      });
-      if (data.ok !== true) return false;
+      if (!await sendTelegramChunk(config, chunk)) return false;
     }
     return text.length > 0;
   } catch { return false; }
+}
+
+async function sendTelegramChunk(config, text) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let data;
+    try {
+      data = await requestJson(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
+        method: "POST", body: new URLSearchParams({ chat_id: config.chatId, text }),
+      });
+    } catch (error) {
+      // Never retry a timeout or connection failure: the message may have arrived.
+      if (error.status !== 429) return false;
+      data = { ok: false, error_code: 429, parameters: { retry_after: error.retryAfter } };
+    }
+    if (data.ok === true) return true;
+    const seconds = data.error_code === 429 ? data.parameters?.retry_after : null;
+    // Retry only an explicit rejection, once, with a bounded provider-specified wait.
+    if (attempt > 0 || !Number.isSafeInteger(seconds) || seconds < 1 || seconds > 10) return false;
+    await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+  }
+  return false;
 }
 
 export async function sendConfiguredReport(settings, event, text, { manual = false, channels = ["line", "telegram"] } = {}) {
