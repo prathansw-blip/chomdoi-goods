@@ -654,7 +654,8 @@ function draw(container) {
       const data = cached ? quotaCache.data : await fetchLineQuota(token);
       if (!container.contains(quotaStatus) || container.querySelector("#s-line-token").value.trim() !== token) return;
       quotaCache = { token, data, checkedAt: Date.now() };
-      const period = new Date(`${data.month}-01T00:00:00Z`).toLocaleDateString("th-TH", { month: "long", year: "numeric", timeZone: "UTC" });
+      // The quota endpoint owns the billing period; do not infer its reset time from the browser's calendar.
+      const period = "รอบเดือนปัจจุบันของ LINE";
       quotaStatus.textContent = data.limit === null
         ? `${period}: ไม่กำหนดเพดานผ่าน API · ใช้แล้วประมาณ ${data.usage.toLocaleString("th-TH")} ข้อความ`
         : `${period}: เหลือประมาณ ${data.remaining.toLocaleString("th-TH")} จาก ${data.limit.toLocaleString("th-TH")} ข้อความ · ใช้แล้ว ${data.usage.toLocaleString("th-TH")}`;
@@ -697,7 +698,11 @@ function draw(container) {
       const liveStatus = container.querySelector("#telegram-status");
       if (liveStatus) liveStatus.textContent = message;
       showToast(message, ok ? "success" : "error");
-    } catch (error) { showWriteError(error); }
+    } catch (error) {
+      const message = showWriteError(error);
+      const liveStatus = container.querySelector("#telegram-status");
+      if (liveStatus) liveStatus.textContent = message;
+    }
     finally {
       telegramTestPending = false;
       const liveButton = container.querySelector("#btn-test-telegram");
