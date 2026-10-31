@@ -1,5 +1,7 @@
 # Chomdoi Goods — คู่มือรับช่วงงาน
 
+Application commit `ac67029` (ฟีเจอร์หลัก `aec762f`, กันกดทดสอบซ้ำระหว่าง sync `8f65a62`) เผยแพร่ Firebase Hosting รุ่น `ba8d10ade4c952fa` เวลา `2026-10-31T14:45:07.604Z` ตรวจไฟล์สาธารณะ 6 ไฟล์ตรงกับ build แล้ว UI แสดงรอบเดือนปัจจุบันตาม LINE แทนอนุมานเวลารีเซ็ตจากปฏิทินเครื่อง และแสดงสถานะข้อผิดพลาดทดสอบ Telegram หลัง sync ถูกต้อง
+
 อัปเดต 31 ตุลาคม 2026: เพิ่มแผงโควต้า LINE ใน Settings (limit, usage, remaining, เดือนและเวลาอ่านล่าสุด) อ่าน API จริงผ่าน LINE Proxy v2 ที่ URL เดิม; cache ใน memory 1 นาที ไม่บันทึกยอดลง Firestore และไม่ตีความข้อผิดพลาดเป็นเหลือ 0 API consumption เป็นค่าประมาณของทั้งบัญชีรวม OA Manager รองรับ type none โดยไม่สมมติว่ามีโควต้าไม่จำกัด
 
 เพิ่ม `settings.telegram` (default ปิด) พร้อม Bot Token, Chat ID/string, checkbox รายงานกะ/รายวัน/stock ต่ำ/ทุกบิล และปุ่มทดสอบใน Settings ใช้รายงานข้อความร่วมกับ LINE ผ่าน `src/utils/lineNotify.js` และ transport ใหม่ `src/utils/notificationTransport.js`; แต่ละช่องทางทำงานอิสระ LINE ล้มไม่ขวาง Telegram ปุ่มส่งสรุปวันนี้แสดงผลสำเร็จ/ล้มแยกช่องทาง Manual send เคารพ enabled แต่ไม่ติด checkbox อัตโนมัติ Telegram ส่งตรง HTTPS official API ด้วย form body ไม่ใช้ parse_mode หรือ paid broadcast รายงานยาวแบ่งไม่เกิน 4000 UTF-16 units โดยไม่ตัด surrogate pairs; ไม่มี automatic retry เพื่อเลี่ยงส่งซ้ำ
