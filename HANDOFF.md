@@ -1,5 +1,7 @@
 # Chomdoi Goods — คู่มือรับช่วงงาน
 
+Application commit `134ee20` เผยแพร่ Firebase Hosting รุ่น `a430a62d47f2a0ab` เวลา `2026-10-31T17:54:28.796Z` (1 พฤศจิกายน 2569 เวลา 00:54 น. ไทย) ตรวจ SHA-256 ไฟล์สาธารณะครบ 6 ไฟล์ตรงกับ build `index-DRy9-IkZ.js` แล้ว ตั้งค่า Production ให้อัตโนมัติเฉพาะเปิด/ปิดกะทั้ง LINE/Telegram และยืนยันหลัง reload แล้ว ทดสอบ 79/79 ผ่าน
+
 อัปเดต 1 พฤศจิกายน 2026 — รายงานสต็อกเฉพาะเปิด/ปิดกะ
 
 - ต้นเหตุแจ้งเตือนถี่: `src/pages/pos.js` เดิมตั้ง timer หลังโหลด 3 วินาที และตรวจหลังขาย โดย throttle อยู่ใน memory ต่อ browser session จึงส่งซ้ำจากหลายเครื่อง/refresh และ timer ยังทำงานแม้ออกจากหน้า POS แล้ว นำ timer, checkAndAlertLowStock และการเรียกหลังขายออกทั้งหมด
@@ -10,7 +12,7 @@
 - ทดสอบรวม **79/79 ผ่าน (11 files)**, notification tests **24/24** ครอบคลุมไม่มี standalone request แม้ flag เก่าเปิด, ข้อความเปิด/ปิดกะเดียวกันทั้งสองช่องทาง, stock 0 และ threshold 0 และไม่ส่ง stock แยกเมื่อปิดรายงานกะ; build ผ่าน มี chunk >500 kB warning เดิม Chrome Emulator บันทึก Settings ใหม่ได้ทั้งสอง legacy flags เป็น false โดย products, transactions, shifts และข้อมูลของใช้เท่าเดิม
 - สำรอง `/Users/keng/.codex/backups/chomdoi-house/stock-shift-only-2026-11-01/`: checkbox state ก่อน/หลัง (ไม่มี token), public-before SHA-256 6 ไฟล์ตรงกับรุ่น 88dbb91c5bc07f39, candidate-dist และ ROLLBACK.md การ rollback Hosting ไม่คืนค่า notification preferences และควรคง stock แยกเป็น false เพื่อไม่กลับมาส่งซ้ำ ต้องบันทึกรายการค้างก่อน refresh ทุกเครื่องให้ใช้โค้ดใหม่
 
-Application commit `1af4c50` (UI/ส่งย้อนหลัง `8f06742`) เผยแพร่ Firebase Hosting รุ่น `88dbb91c5bc07f39` เวลา `2026-10-31T17:28:37.007Z` (1 พฤศจิกายน 2569 เวลา 00:28 น. ไทย) ตรวจ SHA-256 ไฟล์สาธารณะทั้ง 6 ไฟล์ตรงกับ build สุดท้าย `index-DaX0Yqk_.js` แล้ว ทดสอบ 75/75 ผ่าน ไม่มีข้อมูลร้าน Production ถูกแก้ และยังไม่ได้กดส่งรายงานย้อนหลังจริง
+รุ่นก่อนหน้า: Application commit `1af4c50` (UI/ส่งย้อนหลัง `8f06742`) เผยแพร่ Firebase Hosting รุ่น `88dbb91c5bc07f39` เวลา `2026-10-31T17:28:37.007Z` (1 พฤศจิกายน 2569 เวลา 00:28 น. ไทย) ตรวจ SHA-256 ไฟล์สาธารณะทั้ง 6 ไฟล์ตรงกับ build สุดท้าย `index-DaX0Yqk_.js` แล้ว ทดสอบ 75/75 ผ่าน ไม่มีข้อมูลร้าน Production ถูกแก้ และยังไม่ได้กดส่งรายงานย้อนหลังจริง
 
 อัปเดต 1 พฤศจิกายน 2026 — ตรวจ Telegram ไม่พบสรุปกะ
 
