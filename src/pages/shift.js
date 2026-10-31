@@ -16,6 +16,7 @@ import {
   getSyncStatus,
 } from "../data/store.js";
 import { deliveryFeedback } from "../utils/notificationTransport.js";
+import { buildShiftReportData } from "../utils/shiftReport.js";
 import { isAdmin, getCurrentUser } from "../utils/auth.js";
 import { hasShiftForBusinessDate } from "../data/shifts.js";
 import {
@@ -34,6 +35,7 @@ import {
 } from "../utils/utils.js";
 import {
   sendShiftReport,
+  formatShiftReport,
   sendDailySummary,
   sendShiftOpenNotification,
 } from "../utils/lineNotify.js";
@@ -277,7 +279,7 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
               <td>${formatCurrency(sPb.transfer, currency)}</td>
               <td>${sPb.free > 0 ? formatCurrency(sPb.free, currency) : "—"}</td>
               <td><button class="btn-view-bills" data-sid="${s.id}" data-sname="${s.name}" style="background:none;border:1px solid var(--border);color:var(--gold);font-weight:700;font-size:0.9rem;padding:0.25rem 0.7rem;border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition);font-family:'Inter',sans-serif" title="กดเพื่อดูรายละเอียด">${sTxns.length} 🧾</button></td>
-              ${isAdmin() ? `<td>${shiftEditButton(s)} <button class="btn btn-outline btn-del-shift" data-sid="${s.id}" data-sname="${s.name}" data-stotal="${sTotal}" data-sbills="${sTxns.length}" style="padding:0.2rem 0.5rem;font-size:0.75rem;color:var(--red)" title="ลบกะนี้">🗑️</button></td>` : ""}
+              ${isAdmin() ? `<td>${shiftReportButton(s)} ${shiftEditButton(s)} <button class="btn btn-outline btn-del-shift" data-sid="${s.id}" data-sname="${s.name}" data-stotal="${sTotal}" data-sbills="${sTxns.length}" style="padding:0.2rem 0.5rem;font-size:0.75rem;color:var(--red)" title="ลบกะนี้">🗑️</button></td>` : ""}
             </tr>`;
             })
             .join("")}
@@ -377,10 +379,12 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
         const button = event.currentTarget;
         const openerId = document.getElementById("opener-select").value;
         const opener = users.find((u) => u.id === openerId);
-        button.disabled = true;
+        const restore = lockShiftAction(overlay, button);
+        const newShiftId = generateId("shift");
+        let confirmed;
         try {
-          await startShift({
-            id: generateId("shift"),
+          confirmed = await startShift({
+            id: newShiftId,
             defId: def.id,
             name: def.name,
             icon: def.icon,
@@ -394,21 +398,20 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
           }, active?.id || null);
         } catch (error) {
           showWriteError(error);
-          button.disabled = false;
+          restore();
           return;
         }
-        sendShiftOpenNotification({
+        button.textContent = "เปิดกะแล้ว · กำลังส่งรายงาน…";
+        const openedShift = confirmed.shifts.find((shift) => shift.id === newShiftId);
+        const delivery = await sendShiftOpenNotification({
           name: `${def.icon} ${def.name}`,
-          date: formatBusinessDate(getBusinessDate(new Date(), startHour)),
-          startTime: formatTime(new Date().toISOString()),
+          date: formatBusinessDate(openedShift.businessDate),
+          startTime: formatTime(openedShift.startTime),
           openedBy: opener?.displayName,
         });
-        showToast(
-          `เปิด ${def.icon} ${def.name} โดย ${opener?.displayName || "Unknown"}`,
-          "success",
-        );
-        overlay.remove();
-        draw(el.closest(".page-content"));
+        restore();
+        finishShiftAction(overlay, `เปิด${def.name}เรียบร้อยแล้ว`, [["แจ้งเปิดกะ", delivery]],
+          () => draw(el.closest(".page-content")));
       };
     };
   });
@@ -452,7 +455,7 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
         const button = event.currentTarget;
         const closerId = document.getElementById("closer-select").value;
         const closer = users.find((u) => u.id === closerId);
-        button.disabled = true;
+        const restore = lockShiftAction(overlay, button);
         let confirmed;
         try {
           confirmed = await closeShift(
@@ -461,37 +464,11 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
           );
         } catch (error) {
           showWriteError(error);
-          button.disabled = false;
+          restore();
           return;
         }
-        const confirmedShift = confirmed.shifts.find((s) => s.id === active.id);
-        const confirmedTxns = confirmed.transactions.filter((t) => t.shiftId === active.id);
-        const confirmedPb = paymentBreakdown(confirmedTxns);
-        const itemCounts = new Map();
-        confirmedTxns.forEach((txn) => txn.items.forEach((item) =>
-          itemCounts.set(item.name, (itemCounts.get(item.name) || 0) + item.qty)));
-        const ranked = [...itemCounts.entries()].sort((a, b) => b[1] - a[1]);
-        const confirmedTopProduct = ranked[0] ? `${ranked[0][0]} (${ranked[0][1]} ชิ้น)` : "—";
-        const prods = confirmed.products;
-        const lowStockItems = prods.filter(
-          (p) => p.stock > 0 && p.stock <= (p.lowStockThreshold || 5),
-        );
-        sendShiftReport({
-          name: active.name,
-          date: formatBusinessDate(
-            getBusinessDate(active.startTime, startHour),
-          ),
-          startTime: formatTime(active.startTime),
-          endTime: formatTime(confirmedShift.endTime),
-          totalSales: confirmedPb.total,
-          cash: confirmedPb.cash,
-          transfer: confirmedPb.transfer,
-          free: confirmedPb.free,
-          totalBills: confirmedTxns.length,
-          topProduct: confirmedTopProduct,
-          lowStockItems,
-          closedBy: closer?.displayName,
-        });
+        button.textContent = "ปิดกะแล้ว · กำลังส่งรายงาน…";
+        const deliveries = [["สรุปกะ", await sendShiftReport(buildShiftReportData(confirmed, active.id))]];
 
         // เช็คว่าเป็นกะสุดท้ายของวันหรือไม่ → ส่งสรุปยอดประจำวัน
         const lastShiftDef = shiftDefs[shiftDefs.length - 1];
@@ -509,7 +486,7 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
               (s.businessDate || getBusinessDate(s.startTime, startHour)) ===
               todayBizDate,
           );
-          sendDailySummary({
+          deliveries.push(["สรุปวัน", await sendDailySummary({
             date: formatBusinessDate(todayBizDate),
             totalSales: dayPb.total,
             cash: dayPb.cash,
@@ -517,20 +494,18 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
             free: dayPb.free,
             totalBills: dayTxns.length,
             totalShifts: dayShiftsAll.length,
-          });
+          })]);
         }
 
-        showToast(
-          `ปิด${active.name} โดย ${closer?.displayName || "Unknown"}`,
-          "success",
-        );
-        overlay.remove();
-        draw(el.closest(".page-content"));
+        restore();
+        finishShiftAction(overlay, `ปิด${active.name}เรียบร้อยแล้ว`, deliveries,
+          () => draw(el.closest(".page-content")), { allowResend: true });
       };
     };
   }
 
   bindShiftEditors(el, () => draw(el.closest(".page-content")));
+  bindShiftReportButtons(el);
 
   // Event: delete shift (admin only)
   el.querySelectorAll(".btn-del-shift").forEach((btn) => {
@@ -1134,6 +1109,130 @@ function buildYearChart(monthlySales, year, selectedMonthIndex, currency) {
   });
 }
 
+// Keep the confirmed action separate from delivery: a failed message must never
+// prompt staff to close the same shift again or delete its bills.
+function lockShiftAction(overlay, button) {
+  const controls = [...overlay.querySelectorAll("button, select")];
+  const disabled = controls.map((control) => control.disabled);
+  const label = button.textContent;
+  const dismiss = overlay.onclick;
+  const preventUnload = (event) => { event.preventDefault(); event.returnValue = ""; };
+  controls.forEach((control) => { control.disabled = true; });
+  button.textContent = "กำลังบันทึก…";
+  button.setAttribute("aria-busy", "true");
+  overlay.onclick = null;
+  window.addEventListener("beforeunload", preventUnload);
+  return () => {
+    window.removeEventListener("beforeunload", preventUnload);
+    controls.forEach((control, index) => { control.disabled = disabled[index]; });
+    button.textContent = label;
+    button.removeAttribute("aria-busy");
+    overlay.onclick = dismiss;
+  };
+}
+
+function finishShiftAction(overlay, title, deliveries, refresh, { allowResend = false } = {}) {
+  const feedback = deliveries.map(([label, result]) => ({ label, ...deliveryFeedback(result) }));
+  const failed = deliveries.some(([, result]) => Object.values(result)
+    .some((status) => ["failed", "not_configured"].includes(status)));
+  const dismiss = () => { overlay.remove(); refresh(); };
+  if (!failed) {
+    dismiss();
+    showToast(`${title} · ${feedback.map((entry) => `${entry.label}: ${entry.text}`).join(" · ")}`,
+      feedback.some((entry) => entry.type === "warning") ? "warning" : "success");
+    return;
+  }
+  overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="shift-delivery-title" style="max-width:460px">
+    <h2 class="modal-title" id="shift-delivery-title">${escapeHtml(title)}</h2>
+    <div role="alert" style="margin:1rem 0;line-height:1.7">${feedback.map((entry) => `<p>${escapeHtml(entry.label)}: ${escapeHtml(entry.text)}</p>`).join("")}</div>
+    <p style="font-size:0.9rem;color:var(--text-muted)">กะบันทึกเรียบร้อยแล้ว ไม่ต้องทำรายการกะซ้ำ<br>${allowResend ? "Admin ส่งสรุปกะย้อนหลังได้จากปุ่ม “ส่งสรุปกะ” ในประวัติย้อนหลัง" : "กะเปิดแล้ว สามารถขายต่อได้ แม้รายงานเปิดกะส่งไม่สำเร็จ"}</p>
+    <div class="modal-actions"><button class="btn btn-primary" id="shift-delivery-done">รับทราบ</button></div>
+  </div>`;
+  const done = overlay.querySelector("#shift-delivery-done");
+  done.onclick = dismiss;
+  done.focus();
+  overlay.onclick = (event) => { if (event.target === overlay) dismiss(); };
+}
+
+function shiftReportButton(shift) {
+  if (shift.status !== "closed") return "";
+  return `<button class="btn btn-outline btn-shift-report" data-sid="${escapeHtml(shift.id)}"
+    style="min-height:44px;margin:0.2rem;font-size:0.8rem"
+    aria-label="ส่งสรุปกะ ${escapeHtml(shift.name)}">ส่งสรุปกะ</button>`;
+}
+
+function bindShiftReportButtons(el) {
+  el.querySelectorAll(".btn-shift-report").forEach((trigger) => {
+    trigger.onclick = () => {
+      if (!isAdmin()) return;
+      const shiftId = trigger.dataset.sid;
+      const data = buildShiftReportData(getState(), shiftId, { resend: true });
+      if (!data) return showToast("ไม่พบกะที่ปิดแล้ว กรุณาตรวจข้อมูลล่าสุด", "warning");
+      const settings = getSettings();
+      const ready = {
+        line: !!(settings.line?.enabled && settings.line.channelAccessToken && settings.line.targetId),
+        telegram: !!(settings.telegram?.enabled && settings.telegram.botToken && settings.telegram.chatId),
+      };
+      let preview = formatShiftReport(data, settings.currency || "฿");
+      let busy = false;
+      const overlay = document.createElement("div");
+      overlay.className = "modal-overlay";
+      overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="resend-shift-title" style="max-width:580px;max-height:90vh;overflow-y:auto">
+        <h2 class="modal-title" id="resend-shift-title">ส่งสรุปกะย้อนหลัง</h2>
+        <p style="font-size:0.9rem;color:var(--text-muted);line-height:1.6">ตรวจรายงานด้านล่าง แล้วเลือกช่องทางที่ต้องการส่ง<br>การส่งอีกครั้งอาจซ้ำกับข้อความเดิม กรุณาตรวจในแชตก่อน</p>
+        <pre id="resend-shift-preview" style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:0.9rem;line-height:1.65;background:var(--bg-input);padding:1rem;border-radius:var(--radius-sm)"></pre>
+        <div id="resend-shift-status" role="status" aria-live="polite" style="margin:1rem 0"></div>
+        <p style="font-size:0.8rem;color:var(--text-muted)">ช่องทางที่กดไม่ได้ ให้เปิดใช้งานและกรอกข้อมูลในหน้า Settings ก่อน</p>
+        <div class="modal-actions" style="flex-wrap:wrap">
+          <button class="btn btn-outline" id="resend-shift-close">ปิด</button>
+          <button class="btn btn-outline" data-channel="line" ${ready.line ? "" : "disabled"}>ส่งเฉพาะ LINE</button>
+          <button class="btn btn-primary" data-channel="telegram" ${ready.telegram ? "" : "disabled"}>ส่งเฉพาะ Telegram</button>
+        </div>
+      </div>`;
+      overlay.querySelector("#resend-shift-preview").textContent = preview;
+      const dismiss = () => { if (!busy) { overlay.remove(); if (trigger.isConnected) trigger.focus(); } };
+      overlay.querySelector("#resend-shift-close").onclick = dismiss;
+      overlay.onclick = (event) => { if (event.target === overlay) dismiss(); };
+      overlay.onkeydown = (event) => { if (event.key === "Escape") dismiss(); };
+      overlay.querySelectorAll("[data-channel]").forEach((button) => {
+        button.onclick = async () => {
+          if (busy || !isAdmin()) return;
+          const status = overlay.querySelector("#resend-shift-status");
+          const latest = buildShiftReportData(getState(), shiftId, { resend: true });
+          if (!latest) { status.textContent = "ไม่พบกะที่ปิดแล้ว ไม่ได้ส่งข้อความ"; return; }
+          const latestText = formatShiftReport(latest, getSettings().currency || "฿");
+          if (latestText !== preview) {
+            preview = latestText;
+            overlay.querySelector("#resend-shift-preview").textContent = preview;
+            status.textContent = "ข้อมูลกะเปลี่ยนแล้ว กรุณาตรวจรายงานล่าสุด แล้วกดส่งอีกครั้ง";
+            return;
+          }
+          busy = true;
+          const restore = lockShiftAction(overlay, button);
+          button.textContent = "กำลังส่งรายงาน…";
+          status.textContent = "กรุณารอผลการส่ง อย่าเพิ่งปิดหน้านี้";
+          let result;
+          try {
+            result = await sendShiftReport(latest, { manual: true, channels: [button.dataset.channel] });
+            status.textContent = deliveryFeedback(result).text;
+          } catch {
+            status.textContent = "ยืนยันการส่งไม่ได้ กรุณาตรวจในแชตก่อนลองใหม่";
+          } finally {
+            restore();
+            busy = false;
+          }
+          if (result?.[button.dataset.channel] === "sent") {
+            button.disabled = true;
+            button.textContent = "ส่งแล้ว";
+          }
+        };
+      });
+      document.body.appendChild(overlay);
+      overlay.querySelector("#resend-shift-close").focus();
+    };
+  });
+}
+
 function shiftEditButton(shift) {
   return `<button class="btn btn-outline btn-edit-shift" data-sid="${escapeHtml(shift.id)}"
     style="min-height:44px;margin:0.2rem;font-size:0.8rem"
@@ -1334,7 +1433,7 @@ function drawDayDetail(el, date, settings, currency) {
               <div style="text-align:right">
                 <span style="color:var(--gold);font-weight:700;font-size:1.1rem">${formatCurrency(sTotal, currency)}</span>
                 <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem">${sTxns.length} bills</span>
-                ${isAdmin() ? shiftEditButton(s) : ""}
+                ${isAdmin() ? `${shiftReportButton(s)} ${shiftEditButton(s)}` : ""}
               </div>
             </div>
             ${
@@ -1392,6 +1491,7 @@ function drawDayDetail(el, date, settings, currency) {
   `;
 
   bindShiftEditors(el, () => drawDayDetail(el, date, getSettings(), currency));
+  bindShiftReportButtons(el);
 
   // Chart for the day
   if (dayTxns.length > 0) buildChart(dayTxns);

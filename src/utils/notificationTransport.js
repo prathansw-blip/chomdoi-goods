@@ -49,9 +49,10 @@ export async function sendTelegramMessage(config, text) {
   } catch { return false; }
 }
 
-export async function sendConfiguredReport(settings, event, text, { manual = false } = {}) {
+export async function sendConfiguredReport(settings, event, text, { manual = false, channels = ["line", "telegram"] } = {}) {
   const entries = await Promise.all([ ["line", sendLineMessage], ["telegram", sendTelegramMessage] ]
     .map(async ([name, send]) => {
+      if (!channels.includes(name)) return [name, "skipped"];
       const config = settings[name];
       if (!config?.enabled) return [name, "disabled"];
       if (!manual && event && config.notifications?.[event] !== true) return [name, "skipped"];
@@ -66,8 +67,10 @@ export function deliveryFeedback(result) {
   const names = { line: "LINE", telegram: "Telegram" };
   const sent = Object.keys(names).filter(key => result?.[key] === "sent").map(key => names[key]);
   const failed = Object.keys(names).filter(key => ["failed", "not_configured"].includes(result?.[key])).map(key => names[key]);
+  const skipped = Object.keys(names).filter(key => result?.[key] === "skipped").map(key => names[key]);
   return {
-    text: [sent.length ? `ส่งสำเร็จ: ${sent.join(", ")}` : "", failed.length ? `ส่งไม่สำเร็จ: ${failed.join(", ")} — ตรวจการตั้งค่า` : ""].filter(Boolean).join(" · ") || "ยังไม่มีช่องทางที่เปิดใช้งาน",
+    text: [sent.length ? `ส่งสำเร็จ: ${sent.join(", ")}` : "", failed.length ? `ส่งไม่สำเร็จ: ${failed.join(", ")} — ตรวจการตั้งค่า / การเชื่อมต่อ` : ""].filter(Boolean).join(" · ") ||
+      (skipped.length ? `ไม่ได้ส่งรายงาน: ${skipped.join(", ")} — ตรวจตัวเลือกรายงาน` : "ยังไม่มีช่องทางที่เปิดใช้งาน"),
     type: failed.length || !sent.length ? "warning" : "success",
   };
 }

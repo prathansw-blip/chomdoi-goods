@@ -111,9 +111,13 @@ export function updateAppFavicon(logoUrl) {
 }
 
 // ─── Modal observer: toggle body class to prevent flicker ───
+let hadModal = false;
 const modalObserver = new MutationObserver(() => {
-  const hasModal = document.querySelector(".modal-overlay");
-  document.body.classList.toggle("modal-open", !!hasModal);
+  const hasModal = !!document.querySelector(".modal-overlay");
+  document.body.classList.toggle("modal-open", hasModal);
+  // Store updates are deferred in the header while a confirmation/report is open.
+  if (hadModal && !hasModal) updateHeader();
+  hadModal = hasModal;
 });
 modalObserver.observe(document.body, { childList: true, subtree: true });
 

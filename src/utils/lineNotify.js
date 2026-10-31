@@ -22,9 +22,7 @@ export async function sendShiftOpenNotification(data) {
   return report("onShiftClose", lines);
 }
 
-export async function sendShiftReport(shiftData) {
-  const settings = getSettings();
-  const currency = settings.currency || "฿";
+export function formatShiftReport(shiftData, currency = "฿") {
   const lines = [
     `📊 สรุปกะ: ${shiftData.name}`,
     `📅 ${shiftData.date} | ${shiftData.startTime} → ${shiftData.endTime}`,
@@ -43,7 +41,13 @@ export async function sendShiftReport(shiftData) {
       lines.push(`⚠️ ${p.name} — เหลือ ${p.stock} ชิ้น`),
     );
   }
-  return report("onShiftClose", lines);
+  if (shiftData.note) lines.push("", shiftData.note);
+  return lines.join("\n");
+}
+
+export async function sendShiftReport(shiftData, options) {
+  return sendConfiguredReport(getSettings(), "onShiftClose",
+    formatShiftReport(shiftData, getSettings().currency || "฿"), options);
 }
 
 export async function sendDailySummary(data, options) {

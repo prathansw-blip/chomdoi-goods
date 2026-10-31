@@ -7,6 +7,7 @@ import { deliveryFeedback, fetchLineQuota, normalizeLineQuota, sendConfiguredRep
 const { reportSettings } = vi.hoisted(() => ({ reportSettings: {} }));
 vi.mock("../src/data/store.js", () => ({ getSettings: () => reportSettings }));
 import { sendDailySummary, sendShiftReport, sendShiftOpenNotification, sendSupplyCheckNotification } from "../src/utils/lineNotify.js";
+import { buildShiftReportData } from "../src/utils/shiftReport.js";
 
 const line = { enabled: true, channelAccessToken: "synthetic-line-token", targetId: "synthetic-target", notifications: { dailySummary: true } };
 const telegram = { enabled: true, botToken: "12345:synthetic-token", chatId: "-10012345", notifications: { dailySummary: true } };
@@ -20,7 +21,7 @@ describe("independent report delivery", () => {
     vi.stubGlobal("fetch", fetch);
     const result = await sendConfiguredReport({ line, telegram }, "dailySummary", "ยอดขาย ฿220");
     expect(result).toEqual({ line: "failed", telegram: "sent" });
-    expect(deliveryFeedback(result)).toEqual({ text: "ส่งสำเร็จ: Telegram · ส่งไม่สำเร็จ: LINE — ตรวจการตั้งค่า", type: "warning" });
+    expect(deliveryFeedback(result)).toEqual({ text: "ส่งสำเร็จ: Telegram · ส่งไม่สำเร็จ: LINE — ตรวจการตั้งค่า / การเชื่อมต่อ", type: "warning" });
     expect(fetch.mock.calls[1][0]).toBe("https://api.telegram.org/bot12345:synthetic-token/sendMessage");
     expect(fetch.mock.calls[1][1].body.get("chat_id")).toBe("-10012345");
     expect(fetch.mock.calls[1][1].body.get("text")).toBe("ยอดขาย ฿220");
@@ -130,5 +131,63 @@ describe("shared report content with Telegram only", () => {
     expect(text).toContain("เงินสด: ฿80");
     expect(text).toContain("โอน: ฿140");
     expect(text).toContain("ฟรี: ฿20");
+  });
+});
+
+describe("closing report recovery without business mutations", () => {
+  const state = {
+    settings: { businessDayStartHour: 8 },
+    shifts: [{ id: "closed", name: "กะบ่าย", status: "closed", businessDate: "2026-10-31",
+      startTime: "2026-10-31T10:14:00Z", endTime: "2026-10-31T17:00:00Z", closedBy: { displayName: "Wan" } },
+      { id: "active", name: "กะดึก", status: "active" }],
+    transactions: [
+      { shiftId: "closed", total: 120, items: [{ name: "น้ำดื่ม", qty: 12 }] },
+      { shiftId: "closed", total: 100, paymentMethod: "transfer", items: [{ name: "น้ำดื่ม", qty: 10 }] },
+      { shiftId: "closed", total: 80, paymentMethod: "free", items: [{ name: "น้ำดื่ม", qty: 8 }] },
+      { shiftId: "other", total: 999, items: [{ name: "อื่น", qty: 1 }] },
+    ],
+    products: [{ name: "น้ำดื่ม", stock: 3, lowStockThreshold: 5 }],
+  };
+  it("uses only the selected shift, preserves business date across midnight and never changes stock or bills", () => {
+    const original = structuredClone(state);
+    const report = buildShiftReportData(state, "closed");
+    expect(report).toMatchObject({ totalSales: 220, cash: 120, transfer: 100, free: 80,
+      totalBills: 3, closedBy: "Wan", topProduct: "น้ำดื่ม (30 ชิ้น)", lowStockItems: state.products });
+    expect(report.date).toContain("31 ตุลาคม");
+    expect(buildShiftReportData(state, "active")).toBeNull();
+    expect(buildShiftReportData(state, "deleted")).toBeNull();
+    expect(state).toEqual(original);
+  });
+  it("does not misrepresent current stock as a historical closing count", () => {
+    const report = buildShiftReportData(state, "closed", { resend: true });
+    expect(report.lowStockItems).toEqual([]);
+    expect(report.note).toContain("ไม่รวมสต็อกย้อนหลัง");
+    expect(report.totalSales).toBe(220);
+  });
+  it("delivers identical closing report text to LINE and Telegram", async () => {
+    Object.assign(reportSettings, {
+      line: { ...line, notifications: { onShiftClose: true } },
+      telegram: { ...telegram, notifications: { onShiftClose: true } },
+    });
+    const fetch = vi.fn().mockResolvedValue(response({ ok: true })); vi.stubGlobal("fetch", fetch);
+    expect(await sendShiftReport(buildShiftReportData(state, "closed")))
+      .toEqual({ line: "sent", telegram: "sent" });
+    const lineText = JSON.parse(fetch.mock.calls[0][1].body).messages[0].text;
+    expect(fetch.mock.calls[1][1].body.get("text")).toBe(lineText);
+    expect(lineText).toContain("📊 สรุปกะ: กะบ่าย");
+    expect(lineText).toContain("ยอดรวม: ฿220");
+    expect(lineText).toContain("ฟรี: ฿80");
+  });
+  it("resends only to Telegram on request, bypasses auto-event flags and does not also resend LINE", async () => {
+    Object.assign(reportSettings, { line, telegram: { ...telegram, notifications: { onShiftClose: false } } });
+    const fetch = vi.fn().mockResolvedValue(response({ ok: true })); vi.stubGlobal("fetch", fetch);
+    expect(await sendShiftReport(buildShiftReportData(state, "closed", { resend: true }), { manual: true, channels: ["telegram"] }))
+      .toEqual({ line: "skipped", telegram: "sent" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0][0]).toContain("api.telegram.org");
+    expect(fetch.mock.calls[0][1].body.get("text")).toContain("ส่งย้อนหลัง");
+    expect(await sendConfiguredReport({ line, telegram: { ...telegram, enabled: false } }, "onShiftClose", "test", { manual: true, channels: ["telegram"] }))
+      .toEqual({ line: "skipped", telegram: "disabled" });
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
