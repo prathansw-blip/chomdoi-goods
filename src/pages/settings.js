@@ -32,6 +32,7 @@ function applyTheme(theme) {
 
 let unsub = null;
 let quotaCache = null;
+let telegramTestPending = false;
 
 // ═══ Icon Picker Data ═══
 const iconGroups = [
@@ -329,8 +330,8 @@ function draw(container) {
         <label class="checkbox-label"><input type="checkbox" id="s-telegram-stock" ${s.telegram?.notifications?.lowStockAlert ? "checked" : ""}> แจ้งเตือน stock ต่ำ</label>
         <label class="checkbox-label"><input type="checkbox" id="s-telegram-sale" ${s.telegram?.notifications?.onSale ? "checked" : ""}> แจ้งเตือนทุกครั้งที่ขายสินค้า</label>
       </div>
-      <button class="btn btn-outline" id="btn-test-telegram" style="margin-top:0.75rem">ทดสอบส่ง Telegram</button>
-      <p id="telegram-status" role="status" aria-live="polite" style="margin-top:0.75rem;color:var(--text-secondary)">${s.telegram?.enabled ? "เปิดใช้งาน — กดทดสอบเพื่อยืนยันการส่ง" : "ยังไม่ได้เปิดใช้งาน"}</p>
+      <button class="btn btn-outline" id="btn-test-telegram" style="margin-top:0.75rem" ${telegramTestPending ? "disabled" : ""}>ทดสอบส่ง Telegram</button>
+      <p id="telegram-status" role="status" aria-live="polite" style="margin-top:0.75rem;color:var(--text-secondary)">${telegramTestPending ? "กำลังบันทึกและส่งข้อความทดสอบ..." : s.telegram?.enabled ? "เปิดใช้งาน — กดทดสอบเพื่อยืนยันการส่ง" : "ยังไม่ได้เปิดใช้งาน"}</p>
     </div>
 
     <!-- Shift Definitions -->
@@ -680,10 +681,12 @@ function draw(container) {
     container.querySelector("#telegram-status").textContent = event.target.checked ? "ยังไม่บันทึก — กดบันทึกหรือทดสอบ" : "ยังไม่ได้เปิดใช้งาน";
   };
   container.querySelector("#btn-test-telegram").onclick = async (event) => {
+    if (telegramTestPending) return;
     const button = event.currentTarget;
     if (!container.querySelector("#s-telegram-enabled").checked) {
       showToast("กรุณาเปิดใช้งาน Telegram ก่อนทดสอบ", "warning"); return;
     }
+    telegramTestPending = true;
     button.disabled = true;
     const status = container.querySelector("#telegram-status");
     status.textContent = "กำลังบันทึกและส่งข้อความทดสอบ...";
@@ -691,10 +694,15 @@ function draw(container) {
       await saveCurrentSettings(s);
       const ok = await sendTelegramMessage(getSettings().telegram, "🏨 Chomdoi Goods\n✅ เชื่อมต่อ Telegram สำเร็จ!");
       const message = ok ? "ส่งข้อความทดสอบ Telegram สำเร็จ" : "ส่งไม่สำเร็จ — ตรวจ Bot Token, Chat ID และสิทธิ์ของบอต";
-      if (container.contains(status)) status.textContent = message;
+      const liveStatus = container.querySelector("#telegram-status");
+      if (liveStatus) liveStatus.textContent = message;
       showToast(message, ok ? "success" : "error");
     } catch (error) { showWriteError(error); }
-    finally { button.disabled = false; }
+    finally {
+      telegramTestPending = false;
+      const liveButton = container.querySelector("#btn-test-telegram");
+      if (liveButton) liveButton.disabled = false;
+    }
   };
 
   container.querySelector("#btn-test-line").onclick = async (event) => {
