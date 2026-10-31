@@ -10,6 +10,7 @@ import {
 import { showToast, showWriteError, formatHour, escapeHtml } from "../utils/utils.js";
 import { NavIcons } from "../utils/icons.js";
 import { testConnection } from "../utils/lineNotify.js";
+import { fetchLineQuota, sendTelegramMessage } from "../utils/notificationTransport.js";
 import {
   exportData,
   loadData,
@@ -30,6 +31,7 @@ function applyTheme(theme) {
 }
 
 let unsub = null;
+let quotaCache = null;
 
 // ═══ Icon Picker Data ═══
 const iconGroups = [
@@ -297,9 +299,38 @@ function draw(container) {
         <label class="checkbox-label"><input type="checkbox" id="s-line-sale" ${s.line?.notifications?.onSale ? "checked" : ""}> แจ้งเตือนทุกครั้งที่ขายสินค้า</label>
       </div>
       <button class="btn btn-outline" id="btn-test-line" style="margin-top:0.75rem;${lineEnabled ? "" : "display:none"}">📤 ทดสอบส่งข้อความ</button>
+      <div style="margin-top:1rem;padding:1rem;border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <strong>โควต้า LINE คงเหลือเดือนนี้</strong>
+        <p id="line-quota-status" role="status" aria-live="polite" style="margin:0.75rem 0;color:var(--text-secondary)">กรอก Token แล้วกดตรวจสอบโควต้า</p>
+        <button class="btn btn-outline" id="btn-line-quota" type="button">ตรวจสอบโควต้า</button>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem">ค่าประมาณของทั้งบัญชี รวมข้อความที่ส่งจาก LINE Official Account Manager ไม่ใช่ยอดเฉพาะเว็บนี้</p>
+      </div>
       <div class="connection-status ${lineEnabled && s.line?.channelAccessToken ? "status-connected" : "status-disconnected"}" id="line-status" style="margin-top:0.75rem">
         ${lineEnabled && s.line?.channelAccessToken ? "🟢 LINE Bot เปิดใช้งาน" : "⚪ ยังไม่ได้เปิดใช้งาน"}
       </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Telegram Bot</div>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">รับรายงานแยกจาก LINE หรือเปิดทั้งสองช่องทางได้</p>
+      <div class="form-group">
+        <label class="form-label" for="s-telegram-token">Bot Token</label>
+        <div style="display:flex;gap:0.5rem">
+          <input class="form-input" id="s-telegram-token" type="password" placeholder="Token จาก @BotFather" autocomplete="off">
+          <button class="btn btn-outline" id="btn-toggle-telegram-token" type="button" aria-label="แสดงหรือซ่อน Telegram Bot Token">แสดง</button>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label" for="s-telegram-chat">Chat ID / Channel username</label><input class="form-input" id="s-telegram-chat" placeholder="เช่น -100… หรือ @ชื่อช่อง"></div>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem">แชตส่วนตัว: กด Start กับบอตก่อน · กลุ่ม: เพิ่มบอตเข้ากลุ่ม · ช่อง: ให้บอตมีสิทธิ์ส่งข้อความ</p>
+      <label class="checkbox-label"><input type="checkbox" id="s-telegram-enabled" ${s.telegram?.enabled ? "checked" : ""}> เปิดใช้งาน Telegram Bot</label>
+      <div class="checkbox-group" id="telegram-notifications" style="margin-top:0.75rem;padding-left:1.5rem;${s.telegram?.enabled ? "" : "display:none"}">
+        <label class="checkbox-label"><input type="checkbox" id="s-telegram-shift" ${s.telegram?.notifications?.onShiftClose !== false ? "checked" : ""}> ส่งสรุปเมื่อปิดกะ (รวมแจ้งเปิดกะ)</label>
+        <label class="checkbox-label"><input type="checkbox" id="s-telegram-daily" ${s.telegram?.notifications?.dailySummary !== false ? "checked" : ""}> สรุปยอดประจำวัน</label>
+        <label class="checkbox-label"><input type="checkbox" id="s-telegram-stock" ${s.telegram?.notifications?.lowStockAlert ? "checked" : ""}> แจ้งเตือน stock ต่ำ</label>
+        <label class="checkbox-label"><input type="checkbox" id="s-telegram-sale" ${s.telegram?.notifications?.onSale ? "checked" : ""}> แจ้งเตือนทุกครั้งที่ขายสินค้า</label>
+      </div>
+      <button class="btn btn-outline" id="btn-test-telegram" style="margin-top:0.75rem">ทดสอบส่ง Telegram</button>
+      <p id="telegram-status" role="status" aria-live="polite" style="margin-top:0.75rem;color:var(--text-secondary)">${s.telegram?.enabled ? "เปิดใช้งาน — กดทดสอบเพื่อยืนยันการส่ง" : "ยังไม่ได้เปิดใช้งาน"}</p>
     </div>
 
     <!-- Shift Definitions -->
@@ -458,6 +489,8 @@ function draw(container) {
   // Set sensitive values as DOM properties so they never enter the HTML string.
   container.querySelector("#s-line-token").value = s.line?.channelAccessToken || "";
   container.querySelector("#s-line-target").value = s.line?.targetId || "";
+  container.querySelector("#s-telegram-token").value = s.telegram?.botToken || "";
+  container.querySelector("#s-telegram-chat").value = s.telegram?.chatId || "";
 
   // ─── Events ───
   // Category icon picker
@@ -607,6 +640,63 @@ function draw(container) {
     status.textContent = ready ? "🟢 LINE Bot เปิดใช้งาน" : "⚪ ยังไม่ได้เปิดใช้งาน";
   };
 
+  const quotaButton = container.querySelector("#btn-line-quota");
+  const quotaStatus = container.querySelector("#line-quota-status");
+  const refreshQuota = async (force = false) => {
+    const token = container.querySelector("#s-line-token").value.trim();
+    if (!token) { quotaStatus.textContent = "กรุณากรอก Channel Access Token ก่อน"; return; }
+    quotaButton.disabled = true;
+    quotaStatus.textContent = "กำลังตรวจสอบโควต้า...";
+    try {
+      const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit" }).format(new Date());
+      const cached = !force && quotaCache?.token === token && quotaCache.data.month === month && Date.now() - quotaCache.checkedAt < 60000;
+      const data = cached ? quotaCache.data : await fetchLineQuota(token);
+      if (!container.contains(quotaStatus) || container.querySelector("#s-line-token").value.trim() !== token) return;
+      quotaCache = { token, data, checkedAt: Date.now() };
+      const period = new Date(`${data.month}-01T00:00:00Z`).toLocaleDateString("th-TH", { month: "long", year: "numeric", timeZone: "UTC" });
+      quotaStatus.textContent = data.limit === null
+        ? `${period}: ไม่กำหนดเพดานผ่าน API · ใช้แล้วประมาณ ${data.usage.toLocaleString("th-TH")} ข้อความ`
+        : `${period}: เหลือประมาณ ${data.remaining.toLocaleString("th-TH")} จาก ${data.limit.toLocaleString("th-TH")} ข้อความ · ใช้แล้ว ${data.usage.toLocaleString("th-TH")}`;
+      quotaStatus.textContent += ` · ตรวจเมื่อ ${new Date(data.fetchedAt).toLocaleString("th-TH")}`;
+    } catch {
+      if (container.contains(quotaStatus) && container.querySelector("#s-line-token").value.trim() === token) {
+        quotaStatus.textContent = "ตรวจโควต้าไม่ได้ — ตรวจ Token หรือการเชื่อมต่อ แล้วลองใหม่ (ยังไม่ทราบยอดคงเหลือ)";
+      }
+    } finally { if (container.contains(quotaButton)) quotaButton.disabled = false; }
+  };
+  quotaButton.onclick = () => refreshQuota(true);
+  container.querySelector("#s-line-token").addEventListener("input", () => {
+    quotaStatus.textContent = "Token เปลี่ยนแล้ว กดตรวจสอบโควต้าอีกครั้ง";
+  });
+  if (s.line?.channelAccessToken) void refreshQuota();
+
+  container.querySelector("#btn-toggle-telegram-token").onclick = (event) => {
+    const input = container.querySelector("#s-telegram-token");
+    input.type = input.type === "password" ? "text" : "password";
+    event.currentTarget.textContent = input.type === "password" ? "แสดง" : "ซ่อน";
+  };
+  container.querySelector("#s-telegram-enabled").onchange = (event) => {
+    container.querySelector("#telegram-notifications").style.display = event.target.checked ? "" : "none";
+    container.querySelector("#telegram-status").textContent = event.target.checked ? "ยังไม่บันทึก — กดบันทึกหรือทดสอบ" : "ยังไม่ได้เปิดใช้งาน";
+  };
+  container.querySelector("#btn-test-telegram").onclick = async (event) => {
+    const button = event.currentTarget;
+    if (!container.querySelector("#s-telegram-enabled").checked) {
+      showToast("กรุณาเปิดใช้งาน Telegram ก่อนทดสอบ", "warning"); return;
+    }
+    button.disabled = true;
+    const status = container.querySelector("#telegram-status");
+    status.textContent = "กำลังบันทึกและส่งข้อความทดสอบ...";
+    try {
+      await saveCurrentSettings(s);
+      const ok = await sendTelegramMessage(getSettings().telegram, "🏨 Chomdoi Goods\n✅ เชื่อมต่อ Telegram สำเร็จ!");
+      const message = ok ? "ส่งข้อความทดสอบ Telegram สำเร็จ" : "ส่งไม่สำเร็จ — ตรวจ Bot Token, Chat ID และสิทธิ์ของบอต";
+      if (container.contains(status)) status.textContent = message;
+      showToast(message, ok ? "success" : "error");
+    } catch (error) { showWriteError(error); }
+    finally { button.disabled = false; }
+  };
+
   container.querySelector("#btn-test-line").onclick = async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
@@ -694,6 +784,18 @@ function saveCurrentSettings(currentSettings) {
         };
       },
     ),
+    telegram: {
+      ...currentSettings.telegram,
+      botToken: document.getElementById("s-telegram-token").value.trim() || null,
+      chatId: document.getElementById("s-telegram-chat").value.trim() || null,
+      enabled: document.getElementById("s-telegram-enabled").checked,
+      notifications: {
+        onShiftClose: document.getElementById("s-telegram-shift").checked,
+        dailySummary: document.getElementById("s-telegram-daily").checked,
+        lowStockAlert: document.getElementById("s-telegram-stock").checked,
+        onSale: document.getElementById("s-telegram-sale").checked,
+      },
+    },
     line: {
       ...currentSettings.line,
       channelAccessToken: document.getElementById("s-line-token").value.trim() || null,

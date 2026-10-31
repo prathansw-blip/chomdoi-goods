@@ -181,6 +181,10 @@ export const defaultSettings = {
       lowStockAlert: true,
     },
   },
+  telegram: {
+    enabled: false, botToken: null, chatId: null,
+    notifications: { onShiftClose: true, dailySummary: true, lowStockAlert: false, onSale: false },
+  },
   firebase: {
     apiKey: "",
     authDomain: "",

@@ -15,6 +15,7 @@ import {
   getUsers,
   getSyncStatus,
 } from "../data/store.js";
+import { deliveryFeedback } from "../utils/notificationTransport.js";
 import { isAdmin, getCurrentUser } from "../utils/auth.js";
 import { hasShiftForBusinessDate } from "../data/shifts.js";
 import {
@@ -251,7 +252,7 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
         }
       </div>
       ${!active ? `<div style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-muted)">กะชนิดเดียวกันเปิดได้ครั้งเดียวต่อวันทำงาน (${formatBusinessDate(todayBiz)})${currentDef && !hasShiftForBusinessDate(todayShifts, currentDef, todayBiz, startHour) ? `<br>💡 แนะนำ: ตอนนี้ควรเปิด <strong style="color:var(--gold)">${currentDef.icon} ${currentDef.name}</strong>` : ""}</div>` : ""}
-      ${isAdmin() ? `<div style="margin-top:0.75rem"><button class="btn btn-outline" id="btn-send-daily-summary" style="font-size:0.85rem">📋 ส่งสรุปยอดวันนี้ทาง LINE</button></div>` : ""}
+      ${isAdmin() ? `<div style="margin-top:0.75rem"><button class="btn btn-outline" id="btn-send-daily-summary" style="font-size:0.85rem">📋 ส่งสรุปยอดวันนี้ (LINE / Telegram)</button></div>` : ""}
     </div>
 
     <!-- Today's Shifts Overview -->
@@ -323,7 +324,7 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
       );
       dailySummaryBtn.disabled = true;
       dailySummaryBtn.textContent = "📤 กำลังส่ง...";
-      const ok = await sendDailySummary({
+      const result = await sendDailySummary({
         date: formatBusinessDate(todayBiz),
         totalSales: dayPb.total,
         cash: dayPb.cash,
@@ -331,11 +332,11 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
         free: dayPb.free,
         totalBills: todayTxns.length,
         totalShifts: dayShiftsAll.length,
-      });
-      if (ok) showToast("ส่งสรุปยอดประจำวันทาง LINE สำเร็จ", "success");
-      else showToast("ส่งไม่สำเร็จ กรุณาเช็คการตั้งค่า LINE", "error");
+      }, { manual: true });
+      const feedback = deliveryFeedback(result);
+      showToast(feedback.text, feedback.type);
       dailySummaryBtn.disabled = false;
-      dailySummaryBtn.textContent = "📋 ส่งสรุปยอดวันนี้ทาง LINE";
+      dailySummaryBtn.textContent = "📋 ส่งสรุปยอดวันนี้ (LINE / Telegram)";
     };
   }
 
