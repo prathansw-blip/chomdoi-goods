@@ -72,6 +72,8 @@ async function sendTelegramChunk(config, text) {
 }
 
 export async function sendConfiguredReport(settings, event, text, { manual = false, channels = ["line", "telegram"] } = {}) {
+  // Stock alerts are now part of shift opening/closing, never standalone sends.
+  if (event === "lowStockAlert") return { line: "skipped", telegram: "skipped" };
   const entries = await Promise.all([ ["line", sendLineMessage], ["telegram", sendTelegramMessage] ]
     .map(async ([name, send]) => {
       if (!channels.includes(name)) return [name, "skipped"];

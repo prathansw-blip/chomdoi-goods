@@ -1,5 +1,15 @@
 # Chomdoi Goods — คู่มือรับช่วงงาน
 
+อัปเดต 1 พฤศจิกายน 2026 — รายงานสต็อกเฉพาะเปิด/ปิดกะ
+
+- ต้นเหตุแจ้งเตือนถี่: `src/pages/pos.js` เดิมตั้ง timer หลังโหลด 3 วินาที และตรวจหลังขาย โดย throttle อยู่ใน memory ต่อ browser session จึงส่งซ้ำจากหลายเครื่อง/refresh และ timer ยังทำงานแม้ออกจากหน้า POS แล้ว นำ timer, checkAndAlertLowStock และการเรียกหลังขายออกทั้งหมด
+- `src/utils/notificationTransport.js` บล็อก event lowStockAlert แม้ค่าเก่าเปิดอยู่; `src/utils/lineNotify.js` ถอนตัวส่ง stock แบบแยก และแนบรายการสินค้าใกล้หมด/หมดในข้อความเปิดกะและปิดกะเดียวกันทั้ง LINE/Telegram `src/pages/shift.js` ใช้ products จาก confirmed snapshot หลัง startShift; `src/utils/shiftReport.js` รวม stock=0 และเคารพ threshold=0 ส่วนส่งย้อนหลังยังไม่แสดง stock ปัจจุบันเป็นประวัติเดิม
+- `src/pages/settings.js` เปลี่ยน checkbox เป็นคำอธิบายว่ารวมสต็อกในรายงานเปิด/ปิดกะ ใช้ชื่อ checkbox รายงานเปิดกะและปิดกะตรงกันทั้งสองช่องทาง และบันทึก lowStockAlert=false สำหรับ compatibility; default ใน `src/data/seedData.js` ปิด standalone stock alert แล้ว
+- ปรับ notification preferences ผ่าน webapp Production ตามคำขอรายงานอัตโนมัติเฉพาะเปิด/ปิดกะ: ทั้งสอง provider ยัง enabled และ onShiftClose=true; lowStockAlert=false, dailySummary=false, onSale=false โหลดหน้าใหม่ตรวจครบแล้ว จากค่าเดิมเปลี่ยนจริง 4 checkbox: LINE dailySummary, Telegram dailySummary/lowStockAlert/onSale (LINE lowStockAlert/onSale เดิม false) สรุป/ส่งย้อนหลังด้วยปุ่ม manual ยังใช้ได้ ไม่แก้ Rules/Auth/Apps Script, บิลหรือ stock จริง
+- ปิด dailySummary จึงข้ามการเรียกสรุปวันอัตโนมัติตอนปิดกะสุดท้ายด้วย ไม่ขึ้นคำเตือนว่าสรุปวันไม่ได้ส่งทั้งที่ตั้งใจปิดไว้ ไม่มีการกดส่งข้อความทดสอบถึงผู้รับจริงในรอบนี้
+- ทดสอบรวม **79/79 ผ่าน (11 files)**, notification tests **24/24** ครอบคลุมไม่มี standalone request แม้ flag เก่าเปิด, ข้อความเปิด/ปิดกะเดียวกันทั้งสองช่องทาง, stock 0 และ threshold 0 และไม่ส่ง stock แยกเมื่อปิดรายงานกะ; build ผ่าน มี chunk >500 kB warning เดิม Chrome Emulator บันทึก Settings ใหม่ได้ทั้งสอง legacy flags เป็น false โดย products, transactions, shifts และข้อมูลของใช้เท่าเดิม
+- สำรอง `/Users/keng/.codex/backups/chomdoi-house/stock-shift-only-2026-11-01/`: checkbox state ก่อน/หลัง (ไม่มี token), public-before SHA-256 6 ไฟล์ตรงกับรุ่น 88dbb91c5bc07f39, candidate-dist และ ROLLBACK.md การ rollback Hosting ไม่คืนค่า notification preferences และควรคง stock แยกเป็น false เพื่อไม่กลับมาส่งซ้ำ ต้องบันทึกรายการค้างก่อน refresh ทุกเครื่องให้ใช้โค้ดใหม่
+
 Application commit `1af4c50` (UI/ส่งย้อนหลัง `8f06742`) เผยแพร่ Firebase Hosting รุ่น `88dbb91c5bc07f39` เวลา `2026-10-31T17:28:37.007Z` (1 พฤศจิกายน 2569 เวลา 00:28 น. ไทย) ตรวจ SHA-256 ไฟล์สาธารณะทั้ง 6 ไฟล์ตรงกับ build สุดท้าย `index-DaX0Yqk_.js` แล้ว ทดสอบ 75/75 ผ่าน ไม่มีข้อมูลร้าน Production ถูกแก้ และยังไม่ได้กดส่งรายงานย้อนหลังจริง
 
 อัปเดต 1 พฤศจิกายน 2026 — ตรวจ Telegram ไม่พบสรุปกะ

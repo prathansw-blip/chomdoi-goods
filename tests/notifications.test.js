@@ -7,7 +7,7 @@ import { deliveryFeedback, fetchLineQuota, normalizeLineQuota, sendConfiguredRep
 const { reportSettings } = vi.hoisted(() => ({ reportSettings: {} }));
 vi.mock("../src/data/store.js", () => ({ getSettings: () => reportSettings }));
 import { sendDailySummary, sendShiftReport, sendShiftOpenNotification, sendSupplyCheckNotification } from "../src/utils/lineNotify.js";
-import { buildShiftReportData } from "../src/utils/shiftReport.js";
+import { buildShiftReportData, getLowStockItems } from "../src/utils/shiftReport.js";
 
 const line = { enabled: true, channelAccessToken: "synthetic-line-token", targetId: "synthetic-target", notifications: { dailySummary: true } };
 const telegram = { enabled: true, botToken: "12345:synthetic-token", chatId: "-10012345", notifications: { dailySummary: true } };
@@ -55,6 +55,62 @@ describe("independent report delivery", () => {
     expect(fetch).toHaveBeenCalledTimes(parts.length);
     expect(fetch.mock.calls[0][1].body.has("allow_paid_broadcast")).toBe(false);
     expect(fetch.mock.calls[0][1].body.has("parse_mode")).toBe(false);
+  });
+});
+
+describe("stock reporting only at shift boundaries", () => {
+  const products = [
+    { name: "หมด", stock: 0, lowStockThreshold: 0 },
+    { name: "ไม่ต่ำ", stock: 1, lowStockThreshold: 0 },
+    { name: "ใกล้หมด", stock: 3, lowStockThreshold: 3 },
+    { name: "ค่าเริ่มต้น", stock: 5 },
+    { name: "เพียงพอ", stock: 8 },
+  ];
+  it("includes exhausted products, respects zero thresholds and never changes stock", () => {
+    const original = structuredClone(products);
+    expect(getLowStockItems(products).map(product => product.name)).toEqual(["หมด", "ใกล้หมด", "ค่าเริ่มต้น"]);
+    expect(products).toEqual(original);
+  });
+  it("blocks standalone stock alerts even when stale settings enable them or manual mode is requested", async () => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    const settings = { line: { ...line, notifications: { lowStockAlert: true } },
+      telegram: { ...telegram, notifications: { lowStockAlert: true } } };
+    for (const manual of [false, true]) {
+      expect(await sendConfiguredReport(settings, "lowStockAlert", "stock", { manual }))
+        .toEqual({ line: "skipped", telegram: "skipped" });
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("includes low/exhausted stock in one shared message per channel at opening and closing", async () => {
+    Object.assign(reportSettings, {
+      line: { ...line, notifications: { onShiftClose: true, lowStockAlert: false } },
+      telegram: { ...telegram, notifications: { onShiftClose: true, lowStockAlert: false } },
+    });
+    const fetch = vi.fn().mockResolvedValue(response({ ok: true })); vi.stubGlobal("fetch", fetch);
+    const data = { name: "กะบ่าย", date: "31 ตุลาคม", startTime: "17:00", endTime: "00:00",
+      totalSales: 220, cash: 120, transfer: 100, free: 80, totalBills: 10,
+      lowStockItems: getLowStockItems(products) };
+    expect(await sendShiftOpenNotification(data)).toEqual({ line: "sent", telegram: "sent" });
+    expect(await sendShiftReport(data)).toEqual({ line: "sent", telegram: "sent" });
+    expect(fetch).toHaveBeenCalledTimes(4);
+    for (const index of [0, 2]) {
+      const text = JSON.parse(fetch.mock.calls[index][1].body).messages[0].text;
+      expect(fetch.mock.calls[index + 1][1].body.get("text")).toBe(text);
+      expect(text).toContain("🔴 หมด — เหลือ 0 ชิ้น");
+      expect(text).toContain("⚠️ ใกล้หมด — เหลือ 3 ชิ้น");
+      expect(text).not.toContain("เพียงพอ");
+    }
+  });
+  it("honors the shift report switch without separately sending stock alerts", async () => {
+    Object.assign(reportSettings, {
+      line: { ...line, notifications: { onShiftClose: false, lowStockAlert: true } },
+      telegram: { ...telegram, notifications: { onShiftClose: false, lowStockAlert: true } },
+    });
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    const data = { lowStockItems: getLowStockItems(products) };
+    expect(await sendShiftOpenNotification(data)).toEqual({ line: "skipped", telegram: "skipped" });
+    expect(await sendShiftReport(data)).toEqual({ line: "skipped", telegram: "skipped" });
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
 

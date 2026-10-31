@@ -16,7 +16,7 @@ import {
   getSyncStatus,
 } from "../data/store.js";
 import { deliveryFeedback } from "../utils/notificationTransport.js";
-import { buildShiftReportData } from "../utils/shiftReport.js";
+import { buildShiftReportData, getLowStockItems } from "../utils/shiftReport.js";
 import { isAdmin, getCurrentUser } from "../utils/auth.js";
 import { hasShiftForBusinessDate } from "../data/shifts.js";
 import {
@@ -408,6 +408,7 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
           date: formatBusinessDate(openedShift.businessDate),
           startTime: formatTime(openedShift.startTime),
           openedBy: opener?.displayName,
+          lowStockItems: getLowStockItems(confirmed.products),
         });
         restore();
         finishShiftAction(overlay, `เปิด${def.name}เรียบร้อยแล้ว`, [["แจ้งเปิดกะ", delivery]],
@@ -472,7 +473,10 @@ function drawCurrent(el, settings, currency, active, currentDef, todayBiz) {
 
         // เช็คว่าเป็นกะสุดท้ายของวันหรือไม่ → ส่งสรุปยอดประจำวัน
         const lastShiftDef = shiftDefs[shiftDefs.length - 1];
-        if (lastShiftDef && active.defId === lastShiftDef.id) {
+        const notificationSettings = getSettings();
+        const dailyEnabled = ["line", "telegram"].some((channel) =>
+          notificationSettings[channel]?.enabled && notificationSettings[channel].notifications?.dailySummary === true);
+        if (lastShiftDef && active.defId === lastShiftDef.id && dailyEnabled) {
           const todayBizDate = getBusinessDate(active.startTime, startHour);
           const allTransactions = confirmed.transactions;
           const dayTxns = allTransactions.filter(

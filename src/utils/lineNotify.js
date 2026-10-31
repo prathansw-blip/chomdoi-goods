@@ -12,6 +12,14 @@ function report(event, lines, options) {
   return sendConfiguredReport(getSettings(), event, lines.join("\n"), options);
 }
 
+function appendLowStockItems(lines, products) {
+  if (!products?.length) return;
+  lines.push("", "📦 สินค้าใกล้หมด / หมด:");
+  products.forEach((product) => lines.push(
+    `${product.stock === 0 ? "🔴" : "⚠️"} ${product.name} — เหลือ ${product.stock} ชิ้น`,
+  ));
+}
+
 export async function sendShiftOpenNotification(data) {
   const lines = [
     `🟢 เปิดกะ: ${data.name}`,
@@ -19,6 +27,7 @@ export async function sendShiftOpenNotification(data) {
     `⏰ เวลา: ${data.startTime}`,
   ];
   if (data.openedBy) lines.push(`👤 เปิดโดย: ${data.openedBy}`);
+  appendLowStockItems(lines, data.lowStockItems);
   return report("onShiftClose", lines);
 }
 
@@ -35,12 +44,7 @@ export function formatShiftReport(shiftData, currency = "฿") {
   ];
   if (shiftData.closedBy) lines.push(`👤 ปิดกะโดย: ${shiftData.closedBy}`);
   if (shiftData.topProduct) lines.push(`🔝 ขายดีสุด: ${shiftData.topProduct}`);
-  if (shiftData.lowStockItems?.length) {
-    lines.push("", "📦 สินค้า stock ต่ำ:");
-    shiftData.lowStockItems.forEach((p) =>
-      lines.push(`⚠️ ${p.name} — เหลือ ${p.stock} ชิ้น`),
-    );
-  }
+  appendLowStockItems(lines, shiftData.lowStockItems);
   if (shiftData.note) lines.push("", shiftData.note);
   return lines.join("\n");
 }
@@ -67,12 +71,6 @@ export async function sendDailySummary(data, options) {
   return report("dailySummary", lines, options);
 }
 
-export async function sendLowStockAlert(products) {
-  if (!products.length) return;
-  const lines = ["⚠️ แจ้งเตือน: สินค้าใกล้หมด", "━━━━━━━━━━━━━━━━━━━"];
-  products.forEach((p) => lines.push(`🔴 ${p.name} — เหลือ ${p.stock} ชิ้น`));
-  return report("lowStockAlert", lines);
-}
 export async function sendSaleNotification(txn) {
   const settings = getSettings();
   const currency = settings.currency || "฿";

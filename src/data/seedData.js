@@ -178,7 +178,7 @@ export const defaultSettings = {
     notifications: {
       onShiftClose: true,
       dailySummary: true,
-      lowStockAlert: true,
+      lowStockAlert: false,
     },
   },
   telegram: {

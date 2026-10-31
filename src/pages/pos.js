@@ -24,16 +24,11 @@ import {
   getBusinessDate,
   escapeHtml,
 } from "../utils/utils.js";
-import {
-  sendLowStockAlert,
-  sendSaleNotification,
-} from "../utils/lineNotify.js";
+import { sendSaleNotification } from "../utils/lineNotify.js";
 
 let cart = [];
 let activeFilter = "all";
 let unsub = null;
-let _alertedStockIds = new Set(); // throttle: ส่งแค่ครั้งเดียวต่อ session ต่อสินค้า
-let _initialAlertDone = false; // เช็คครั้งแรกที่เปิดหน้า POS
 
 export function renderPOS(container) {
   if (unsub) unsub();
@@ -42,31 +37,6 @@ export function renderPOS(container) {
   draw(container);
   unsub = subscribe(() => {
     if (!document.querySelector(".modal-overlay") && !getSyncStatus().pending) draw(container);
-  });
-
-  // เช็ค stock ต่ำทีแรกเดียว (session)
-  if (!_initialAlertDone) {
-    _initialAlertDone = true;
-    setTimeout(() => checkAndAlertLowStock(), 3000); // รอ 3 วิ หลังโหลดเสร็จ
-  }
-}
-
-// ส่ง LINE alert เมื่อ stock ต่ำ (ใช้ throttle ไม่ส่งซ้ำต่อ session)
-function checkAndAlertLowStock() {
-  const products = getProducts();
-  const newLow = products.filter(
-    (p) =>
-      p.stock > 0 &&
-      p.stock <= (p.lowStockThreshold || 5) &&
-      !_alertedStockIds.has(p.id),
-  );
-  if (newLow.length) {
-    newLow.forEach((p) => _alertedStockIds.add(p.id));
-    sendLowStockAlert(newLow);
-  }
-  // Reset IDs ถ้า stock เติมใหม่แล้ว (สินค้าที่เคยแจ้งแล้ว stock กลับมา จะแจ้งได้ใหม่)
-  products.forEach((p) => {
-    if (p.stock > (p.lowStockThreshold || 5)) _alertedStockIds.delete(p.id);
   });
 }
 
@@ -420,7 +390,6 @@ async function confirmSale(container, paymentMethod = "cash", freeReason = null)
     return false;
   }
   sendSaleNotification(txn);
-  checkAndAlertLowStock();
   const labels = { cash: "💵 เงินสด", transfer: "📱 เงินโอน", free: "🎁 ฟรี" };
   showToast(
     `ขายสำเร็จ — ${formatCurrency(txn.total, getSettings().currency || "฿")} (${labels[paymentMethod]})`,

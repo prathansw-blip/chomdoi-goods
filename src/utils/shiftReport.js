@@ -1,5 +1,10 @@
 import { formatBusinessDate, formatTime, getBusinessDate } from "./utils.js";
 
+export function getLowStockItems(products) {
+  return products.filter((product) => product.stock >= 0 &&
+    product.stock <= (product.lowStockThreshold ?? 5));
+}
+
 // Read a confirmed store snapshot. Reporting must never edit a shift, sale or stock.
 export function buildShiftReportData(store, shiftId, { resend = false } = {}) {
   const shift = store.shifts.find((entry) => entry.id === shiftId);
@@ -24,8 +29,7 @@ export function buildShiftReportData(store, shiftId, { resend = false } = {}) {
     topProduct: top ? `${top[0]} (${top[1]} ชิ้น)` : "—",
     closedBy: shift.closedBy?.displayName,
     // There is no historical stock snapshot; never present today's stock as closing stock.
-    lowStockItems: resend ? [] : store.products.filter((product) =>
-      product.stock > 0 && product.stock <= (product.lowStockThreshold || 5)),
+    lowStockItems: resend ? [] : getLowStockItems(store.products),
     note: resend ? "ℹ️ ส่งย้อนหลังจากข้อมูลกะปัจจุบัน ไม่รวมสต็อกย้อนหลัง" : null,
   };
 }

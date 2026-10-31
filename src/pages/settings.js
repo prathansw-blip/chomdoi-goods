@@ -294,9 +294,9 @@ function draw(container) {
         เปิดใช้งาน LINE Bot
       </label>
       <div class="checkbox-group" id="line-notifications" style="margin-top:0.75rem;padding-left:1.5rem;${lineEnabled ? "" : "display:none"}">
-        <label class="checkbox-label"><input type="checkbox" id="s-line-shift" ${s.line?.notifications?.onShiftClose !== false ? "checked" : ""}> ส่งสรุปเมื่อปิดกะ</label>
+        <label class="checkbox-label"><input type="checkbox" id="s-line-shift" ${s.line?.notifications?.onShiftClose !== false ? "checked" : ""}> ส่งรายงานเปิดกะและปิดกะ</label>
         <label class="checkbox-label"><input type="checkbox" id="s-line-daily" ${s.line?.notifications?.dailySummary !== false ? "checked" : ""}> สรุปยอดประจำวัน</label>
-        <label class="checkbox-label"><input type="checkbox" id="s-line-stock" ${s.line?.notifications?.lowStockAlert !== false ? "checked" : ""}> แจ้งเตือน stock ต่ำ</label>
+        <p style="font-size:0.85rem;color:var(--text-muted)">รายการสินค้าใกล้หมด / หมด จะแนบในรายงานเปิดกะและปิดกะ ไม่ส่งแจ้งเตือนแยก</p>
         <label class="checkbox-label"><input type="checkbox" id="s-line-sale" ${s.line?.notifications?.onSale ? "checked" : ""}> แจ้งเตือนทุกครั้งที่ขายสินค้า</label>
       </div>
       <button class="btn btn-outline" id="btn-test-line" style="margin-top:0.75rem;${lineEnabled ? "" : "display:none"}">📤 ทดสอบส่งข้อความ</button>
@@ -325,9 +325,9 @@ function draw(container) {
       <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem">แชตส่วนตัว: กด Start กับบอตก่อน · กลุ่ม: เพิ่มบอตเข้ากลุ่ม · ช่อง: ให้บอตมีสิทธิ์ส่งข้อความ</p>
       <label class="checkbox-label"><input type="checkbox" id="s-telegram-enabled" ${s.telegram?.enabled ? "checked" : ""}> เปิดใช้งาน Telegram Bot</label>
       <div class="checkbox-group" id="telegram-notifications" style="margin-top:0.75rem;padding-left:1.5rem;${s.telegram?.enabled ? "" : "display:none"}">
-        <label class="checkbox-label"><input type="checkbox" id="s-telegram-shift" ${s.telegram?.notifications?.onShiftClose !== false ? "checked" : ""}> ส่งสรุปเมื่อปิดกะ (รวมแจ้งเปิดกะ)</label>
+        <label class="checkbox-label"><input type="checkbox" id="s-telegram-shift" ${s.telegram?.notifications?.onShiftClose !== false ? "checked" : ""}> ส่งรายงานเปิดกะและปิดกะ</label>
         <label class="checkbox-label"><input type="checkbox" id="s-telegram-daily" ${s.telegram?.notifications?.dailySummary !== false ? "checked" : ""}> สรุปยอดประจำวัน</label>
-        <label class="checkbox-label"><input type="checkbox" id="s-telegram-stock" ${s.telegram?.notifications?.lowStockAlert ? "checked" : ""}> แจ้งเตือน stock ต่ำ</label>
+        <p style="font-size:0.85rem;color:var(--text-muted)">รายการสินค้าใกล้หมด / หมด จะแนบในรายงานเปิดกะและปิดกะ ไม่ส่งแจ้งเตือนแยก</p>
         <label class="checkbox-label"><input type="checkbox" id="s-telegram-sale" ${s.telegram?.notifications?.onSale ? "checked" : ""}> แจ้งเตือนทุกครั้งที่ขายสินค้า</label>
       </div>
       <button class="btn btn-outline" id="btn-test-telegram" style="margin-top:0.75rem" ${telegramTestPending ? "disabled" : ""}>ทดสอบส่ง Telegram</button>
@@ -805,7 +805,7 @@ function saveCurrentSettings(currentSettings) {
       notifications: {
         onShiftClose: document.getElementById("s-telegram-shift").checked,
         dailySummary: document.getElementById("s-telegram-daily").checked,
-        lowStockAlert: document.getElementById("s-telegram-stock").checked,
+        lowStockAlert: false,
         onSale: document.getElementById("s-telegram-sale").checked,
       },
     },
@@ -817,7 +817,7 @@ function saveCurrentSettings(currentSettings) {
       notifications: {
         onShiftClose: document.getElementById("s-line-shift").checked,
         dailySummary: document.getElementById("s-line-daily").checked,
-        lowStockAlert: document.getElementById("s-line-stock").checked,
+        lowStockAlert: false,
         onSale: document.getElementById("s-line-sale").checked,
       },
     },
